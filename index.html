@@ -106,9 +106,9 @@
     </div>
 
     <script>
-        // ★ 核心設定：您的 Google Apps Script 部署網址 ★
-        const API_URL = "https://script.google.com/macros/s/AKfycbyVkpkIiltM-qHnlbB62QAIgwQr4m2DsqJ12mSIeIsk1YcLRk9DAtKXvAERS3pnWwQHDg/exec";
-        const SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/1TGkgxqP1litJyu0U4VA0v2paDprZtCOQK5RtQ0QofWY/edit";
+        // ★ 核心設定：請替換為您在新試算表部署後獲得的「最新」Web App 網址 ★
+        const API_URL = "https://script.google.com/macros/s/AKfycbz7PtbghRamEPlybfPOGK91ETLKZTE5vLE9gTLu5X1L70NvhStL-kSoRgIU16sjx6UUMg/exec";
+        const SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/1ZGIrD_q14YMOcpyCRBwI3bbE58ekyWuz1pUooD9M7pY/edit?gid=0#gid=0";
         const PASSWORD = "94800552";
 
         let remainingSeconds = 0;
@@ -125,15 +125,18 @@
             return (h2 * 60 + m2) - (h1 * 60 + m1);
         }
 
-        // 修改後的讀取函式：使用 Fetch API
         function loadSchedule() {
-            if (updateStatus !== "連線失敗") updateStatus = "讀取中...";
+            updateStatus = "讀取中...";
             updateFooterStatus();
             
-            // 加上時間戳記避免瀏覽器快取
+            // 使用 fetch API 呼叫後端
             fetch(`${API_URL}?t=${new Date().getTime()}`)
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) throw new Error('網路回應不正常');
+                return response.json();
+            })
             .then(data => {
+                if (data.error) throw new Error(data.error);
                 updateStatus = "成功";
                 handleData(data);
                 updateFooterStatus();
@@ -142,16 +145,18 @@
                 console.error("Fetch Error:", err);
                 updateStatus = "連線失敗";
                 updateFooterStatus();
+                // 顯示失敗狀態在計時器上
+                document.getElementById('timer-main').textContent = "FAIL";
+                document.getElementById('timer-main').style.color = "#e74c3c";
             });
         }
 
         function handleData(data) {
-            // 清除現有計時
             clearInterval(countdownInterval);
 
             if (data && data.current) {
-                document.getElementById('curr-name').textContent = data.current.name;
-                document.getElementById('curr-speaker').textContent = data.current.speaker;
+                document.getElementById('curr-name').textContent = data.current.name || "--";
+                document.getElementById('curr-speaker').textContent = data.current.speaker || "--";
                 const duration = t2m(data.current.start, data.current.end);
                 document.getElementById('curr-time').textContent = `${data.current.start} - ${data.current.end} (${duration}Min)`;
                 
@@ -168,8 +173,7 @@
                     }
                 }, 1000);
             } else {
-                // 無進行中也無預備中的課程
-                document.getElementById('curr-name').textContent = "暫無課程";
+                document.getElementById('curr-name').textContent = "課間休息 / 尚未開始";
                 document.getElementById('curr-speaker').textContent = "--";
                 document.getElementById('curr-time').textContent = "--:-- - --:--";
                 document.getElementById('timer-main').textContent = "00:00";
@@ -178,8 +182,8 @@
             }
 
             if (data && data.next) {
-                document.getElementById('next-name').textContent = data.next.name;
-                document.getElementById('next-speaker').textContent = data.next.speaker;
+                document.getElementById('next-name').textContent = data.next.name || "--";
+                document.getElementById('next-speaker').textContent = data.next.speaker || "--";
                 const nextDuration = t2m(data.next.start, data.next.end);
                 document.getElementById('next-time').textContent = `${data.next.start} - ${data.next.end} (${nextDuration}Min)`;
             } else {
@@ -204,7 +208,6 @@
                 timerEl.style.color = "white"; 
             }
             
-            // 提醒觸發邏輯
             if (!isPreroll) {
                 const pts = { 900:15, 300:5, 180:3, 60:1 };
                 if (pts[remainingSeconds]) triggerTimeAlert('minutes', pts[remainingSeconds]);
