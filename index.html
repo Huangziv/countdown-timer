@@ -364,6 +364,9 @@
     </div>
 
     <script>
+        // 設定 Web App API URL (取代原本的 google.script.run)
+        const API_URL = "https://script.google.com/macros/s/AKfycbyVkpkIiltM-qHnlbB62QAIgwQr4m2DsqJ12mSIeIsk1YcLRk9DAtKXvAERS3pnWwQHDg/exec";
+
         // 密碼和 URL 設定
         const SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/1TGkgxqP1litJyu0U4VA0v2paDprZtCOQK5RtQ0QofWY/edit";
         const PASSWORD = "94800552";
@@ -410,7 +413,7 @@
             // 2. 隱藏頂部按鈕
             document.getElementById('advance-schedule-btn').style.display = 'none';
 
-            // 3. [修正] 僅移除方塊，不觸發載入下一堂課
+            // 3. 僅移除方塊，不觸發載入下一堂課
             showStatus("已手動移除「時間到」提醒方塊。", 1500);
         }
         // --- 核心功能 結束 ---
@@ -455,7 +458,7 @@
             alertTimeout = setTimeout(() => {
                 closeAlert();
 
-                // **[修正] 如果是 'end' 提醒，超時後只關閉方塊和隱藏按鈕**
+                // 如果是 'end' 提醒，超時後只關閉方塊和隱藏按鈕
                 if (type === 'end') {
                     document.getElementById('advance-schedule-btn').style.display = 'none';
                     showStatus("「時間到」提醒視窗已自動關閉。", 1500);
@@ -629,7 +632,7 @@
                 // 觸發「時間到」提醒 (保持 2 分鐘，但不控制排程)
                 triggerTimeAlert('end', null);
 
-                // **[修正] 立即載入下一程序**
+                // 立即載入下一程序
                 showStatus("課程時間到！立即載入下一堂課...", 1500);
                 loadSchedule();
 
@@ -666,7 +669,6 @@
                 } else {
                     // 課程剛結束 (但排程已前進)，保留資訊
                     updateCountdownDisplay();
-                    // [修正] 保留 currentInfoName/Time 的內容，不覆蓋
                 }
 
             } else {
@@ -694,25 +696,42 @@
         function handleFailure(error) {
             reEnableRefresh(false);
             document.getElementById('advance-schedule-btn').style.display = 'none';
-            currentInfoName.textContent = "課程/講師: 錯誤！請檢查試算表";
+            currentInfoName.textContent = "課程/講師: 錯誤！請檢查連線或試算表";
             currentInfoTime.textContent = "時間: 詳情請見控制台 (Console)";
             nextInfoName.textContent = "課程/講師: 載入失敗！";
-            nextInfoName.textContent = "時間: --:-- - --:--";
+            nextInfoTime.textContent = "時間: --:-- - --:--";
             timerMain.textContent = "FAIL";
             timerWrapper.style.display = 'inline-block';
             showStatus("❌ 載入排程失敗！", 5000);
             console.error("載入排程失敗:", error);
         }
 
+        // ==========================================
+        // 修改：使用 Fetch API 替代 google.script.run
+        // ==========================================
         function loadSchedule() {
             refreshBtn.disabled = true;
             refreshBtn.textContent = '載入中...';
-            showStatus("正在重新載入數據...", 1500);
+            showStatus("正在透過 API 重新載入數據...", 1500);
 
-            google.script.run
-                .withSuccessHandler(handleSchedule)
-                .withFailureHandler(handleFailure)
-                .getScheduleInfo();
+            // 加上時間戳記避免瀏覽器快取舊資料
+            const urlWithCacheBuster = `${API_URL}?t=${new Date().getTime()}`;
+
+            fetch(urlWithCacheBuster)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    // 將抓取到的 JSON 資料傳遞給原本處理排程的函式
+                    handleSchedule(data);
+                })
+                .catch(error => {
+                    // 發生錯誤時，呼叫原本的錯誤處理函式
+                    handleFailure(error);
+                });
         }
 
         function toggleFullScreen() {
