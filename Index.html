@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <base target="_top">
+    <style>
+        /* 全域設定 */
+        body {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            margin: 0;
+            background-color: #383d42;
+            color: white;
+            font-family: '微軟正黑體', 'Arial', sans-serif;
+            padding: 30px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* 頂部控制列 */
+        .top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+            margin-bottom: 40px;
+        }
+
+        /* 左上角日期時間 */
+        .top-left-info {
+            font-size: 1.5em;
+            font-weight: 300;
+            color: #ddd;
+        }
+
+        /* 頂部按鈕容器 */
+        .top-right-controls button {
+            border: none;
+            padding: 15px 25px;
+            margin-left: 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1.2em;
+            font-weight: bold;
+            transition: background-color 0.3s;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+        }
+
+        /* [新增] 關閉提醒按鈕樣式 */
+        #advance-schedule-btn {
+            background-color: #f1c40f; /* 黃色 */
+            color: #383d42; /* 深色文字 */
+        }
+        #advance-schedule-btn:hover { background-color: #f39c12; }
+
+        #refresh-btn {
+            background-color: #5480B2;
+            color: white;
+        }
+        #refresh-btn:hover:not(:disabled) { background-color: #6390C5; }
+        #refresh-btn:disabled { cursor: not-allowed; background-color: #7f8c8d; } /* 禁用樣式 */
+
+        #fullscreen-btn {
+            background-color: #34AA59;
+            color: white;
+        }
+        #fullscreen-btn:hover { background-color: #42BF68; }
+
+
+        /* 主要倒數計時區塊 (向上平移 50px) */
+        .main-display {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            transform: translateY(-50px);
+        }
+
+        /* 計時器容器 */
+        #timer-wrapper {
+            display: inline-block;
+            padding: 0;
+            background: none;
+            box-shadow: none;
+            border-radius: 10px;
+            border: 8px solid transparent;
+        }
+
+        /* 計時器數字 - 關鍵調整 */
+        #timer-main {
+            font-size: 26em;
+            font-weight: 900;
+            color: #ffffff;
+            line-height: 1;
+            transition: color 0.5s;
+        }
+
+        /* 3 - 5 分鐘: 綠色 */
+        .green-alert #timer-main { color: #34AA59 !important; }
+
+        /* 1 - 3 分鐘: 黃色 */
+        .yellow-alert #timer-main { color: #f39c12 !important; }
+
+        /* < 1 分鐘: 紅色 */
+        .critical #timer-main { color: #e74c3c !important; }
+
+        /* 邊框閃爍樣式 */
+        .border-white {
+            border-color: white !important;
+            box-shadow: 0 0 20px white;
+        }
+        .border-orange {
+            border-color: #f39c12 !important;
+            box-shadow: 0 0 20px #f39c12;
+        }
+
+        /* 底部課程資訊容器 (向上平移 50px) */
+        .course-cards-container {
+            display: flex;
+            justify-content: center;
+            width: 100%;
+            max-width: 1200px;
+            margin: 0 auto 80px auto;
+            padding-bottom: 20px;
+            transform: translateY(-50px);
+        }
+
+        /* 課程卡片樣式 - 恢復並排顯示 */
+        .course-card {
+            padding: 20px;
+            background-color: #464a4f;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+            flex: 1 1 45%;
+            margin: 0 15px;
+        }
+
+        .card-title {
+            font-size: 20px;
+            font-weight: bold;
+            padding-bottom: 8px;
+            margin-bottom: 8px;
+            border-bottom: 2px solid;
+        }
+
+        /* 課程內容文字統一大小 */
+        .card-content p {
+            margin: 5px 0;
+            line-height: 1.4;
+            font-size: 20px;
+        }
+
+        .card-content .name-speaker {
+            font-weight: normal;
+            color: #ecf0f1;
+        }
+        .card-content .time-duration {
+            color: #bdc3c7;
+        }
+
+        /* 右下角連結樣式 */
+        .bottom-right-link {
+            position: fixed;
+            right: 30px;
+            bottom: 30px;
+            font-size: 1.1em;
+        }
+        .bottom-right-link a {
+            color: #3498db;
+            text-decoration: none;
+            padding: 10px 15px;
+            background-color: #282a2d;
+            border-radius: 5px;
+            transition: color 0.3s;
+        }
+        .bottom-right-link a:hover {
+            color: #5dade2;
+            text-decoration: underline;
+        }
+
+        /* 左下角版本資訊與狀態 */
+        .bottom-left-info {
+            position: fixed;
+            left: 30px;
+            bottom: 30px;
+            font-size: 1.1em;
+            color: #bdc3c7;
+        }
+
+        /* 載入狀態文字 */
+        #status-text {
+            color: #f7d562;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+
+        /* --- Min 提醒視窗樣式 --- */
+        #time-alert-box {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: #e74c3c;
+            color: white;
+            padding: 40px 60px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            text-align: center;
+            z-index: 999;
+            display: none;
+            font-size: 100px;
+            line-height: 1.2;
+            font-weight: bold;
+            transition: opacity 0.3s;
+            width: max-content;
+        }
+        #time-alert-box .line1 {
+            margin-bottom: 5px;
+        }
+
+        #alert-minutes {
+            font-size: 450px;
+            line-height: 1;
+            display: block;
+            font-weight: 900;
+            white-space: nowrap;
+            color: white;
+        }
+
+        /* --- 分鐘數字閃爍顏色樣式 --- */
+        .flash-yellow { color: #f1c40f !important; }
+        .flash-white { color: #ffffff !important; }
+        .flash-red { color: #c0392b !important; }
+
+        /* --- Modal 樣式 (省略) --- */
+        #password-modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        #password-modal-box {
+            background-color: #464a4f;
+            padding: 40px;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+            text-align: center;
+            width: 350px;
+        }
+
+        #password-modal-box h3 {
+            margin-top: 0;
+            margin-bottom: 20px;
+        }
+
+        #password-input {
+            padding: 10px;
+            margin-bottom: 15px;
+            width: 80%;
+            border-radius: 5px;
+            border: 1px solid #5480B2;
+            font-size: 1.1em;
+            background-color: #383d42;
+            color: white;
+        }
+
+        #password-modal-box button {
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background-color 0.2s;
+        }
+
+        #password-modal-box button:first-of-type {
+            background-color: #34AA59;
+            color: white;
+        }
+
+        #password-modal-box button:last-of-type {
+            background-color: #e74c3c;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="top-bar">
+        <div class="top-left-info" id="top-info">
+            載入中...
+        </div>
+        <div class="top-right-controls">
+            <button id="advance-schedule-btn" style="display: none;" onclick="manualAdvanceSchedule()">關閉提醒</button>
+            <button id="refresh-btn" onclick="loadSchedule()">重新整理 (數據)</button>
+            <button id="fullscreen-btn" onclick="toggleFullScreen()">全螢幕顯示 (F11)</button>
+        </div>
+    </div>
+
+    <div class="main-display">
+
+        <div id="timer-wrapper">
+            <div id="timer-main">--:--</div>
+        </div>
+    </div>
+
+    <div class="course-cards-container">
+
+        <div class="course-card current">
+            <div class="card-title">
+                <span class="icon">🔴</span> 當前課程
+            </div>
+            <div class="card-content">
+                <p class="name-speaker" id="current-info-name">課程/講師: 準備中</p>
+                <p class="time-duration" id="current-info-time">時間: --:-- - --:--</p>
+            </div>
+        </div>
+
+        <div class="course-card next">
+            <div class="card-title">
+                <span class="icon">▶️</span> 下堂課程
+            </div>
+            <div class="card-content">
+                <p class="name-speaker" id="next-info-name">課程/講師: 準備中</p>
+                <p class="time-duration" id="next-info-time">時間: --:-- - --:--</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="bottom-right-link">
+        <a href="#" onclick="showPasswordModal(); return false;">
+            Sheet後台
+        </a>
+    </div>
+
+    <div class="bottom-left-info">
+        三重視聽-ZIV v2025.11
+        <span id="status-text" style="display: none;"></span>
+    </div>
+
+    <div id="password-modal-overlay">
+        <div id="password-modal-box">
+            <h3>輸入密碼以轉跳至後台</h3>
+            <p id="modal-countdown">剩餘時間: 30 秒</p>
+            <input type="password" id="password-input" placeholder="密碼 (統編)">
+            <p id="modal-error" style="color: #e74c3c; display: none; font-size: 1.1em; font-weight: bold;">密碼錯誤！3 秒後自動跳回原畫面。</p>
+            <button onclick="checkPassword()">確認</button>
+            <button onclick="hidePasswordModal(false)">取消</button>
+        </div>
+    </div>
+
+    <div id="time-alert-box">
+        <div class="line1" id="line1-text">提醒您剩下</div>
+        <div id="alert-minutes"></div>
+    </div>
+
+    <script>
+        // 密碼和 URL 設定
+        const SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/1TGkgxqP1litJyu0U4VA0v2paDprZtCOQK5RtQ0QofWY/edit";
+        const PASSWORD = "94800552";
+
+        let remainingSeconds = 0;
+        let countdownInterval;
+        let realTimeInterval;
+        let nextCountdownInterval;
+        let currentScheduleInfo = null;
+
+        // Modal 相關變數
+        let modalTimeout;
+        let modalCountdownInterval;
+        const modalOverlay = document.getElementById('password-modal-overlay');
+        const passwordInput = document.getElementById('password-input');
+        const modalCountdown = document.getElementById('modal-countdown');
+        const modalError = document.getElementById('modal-error');
+
+        // 分鐘提醒相關變數
+        const timeAlertBox = document.getElementById('time-alert-box');
+        const alertMinutesDisplay = document.getElementById('alert-minutes');
+        const line1Text = document.getElementById('line1-text');
+
+        let alertTimeout;
+        let alertFlashInterval;
+        let currentAlertType = null;
+
+
+        // --- 核心功能：關閉提醒視窗 ---
+        function closeAlert() {
+            // 清除 2 分鐘自動切換定時器 (或分鐘提醒定時器)
+            clearTimeout(alertTimeout);
+            clearInterval(alertFlashInterval);
+            timeAlertBox.style.display = 'none';
+            // 重設顏色為預設白色
+            alertMinutesDisplay.classList.remove('flash-yellow', 'flash-white', 'flash-red');
+        }
+
+        // --- 頂部按鈕：手動移除提醒方塊 (不觸發 loadSchedule) ---
+        function manualAdvanceSchedule() {
+            // 1. 清除 2 分鐘自動關閉定時器 (如果有) 並關閉提醒
+            closeAlert();
+
+            // 2. 隱藏頂部按鈕
+            document.getElementById('advance-schedule-btn').style.display = 'none';
+
+            // 3. [修正] 僅移除方塊，不觸發載入下一堂課
+            showStatus("已手動移除「時間到」提醒方塊。", 1500);
+        }
+        // --- 核心功能 結束 ---
+
+
+        // --- 分鐘提醒功能 ---
+        function triggerTimeAlert(type, value) {
+            // 清除現有的隱藏定時器和閃爍間隔
+            clearTimeout(alertTimeout);
+            clearInterval(alertFlashInterval);
+
+            let durationMs = 10000; // 預設 10 秒 (給分鐘提醒用)
+
+            if (type === 'end') {
+                alertMinutesDisplay.textContent = "時間到";
+                line1Text.textContent = "提醒您";
+                durationMs = 120000; // **2 分鐘**
+
+            } else if (type === 'minutes') {
+                // 5, 3, 1 Minute Alerts
+                alertMinutesDisplay.textContent = `${value} 分鐘`;
+                line1Text.textContent = "提醒您剩下";
+            }
+
+            // 顯示提醒
+            timeAlertBox.style.display = 'block';
+
+            // 2. 開始閃爍邏輯 (黃色/白色, 0.5s)
+            const colors = ['flash-yellow', 'flash-white'];
+            let colorIndex = 0;
+
+            function flash() {
+                alertMinutesDisplay.classList.remove('flash-yellow', 'flash-white', 'flash-red');
+                alertMinutesDisplay.classList.add(colors[colorIndex]);
+                colorIndex = (colorIndex + 1) % colors.length;
+            }
+
+            flash();
+            alertFlashInterval = setInterval(flash, 500);
+
+            // 3. 設定自動關閉 Timeout
+            alertTimeout = setTimeout(() => {
+                closeAlert();
+
+                // **[修正] 如果是 'end' 提醒，超時後只關閉方塊和隱藏按鈕**
+                if (type === 'end') {
+                    document.getElementById('advance-schedule-btn').style.display = 'none';
+                    showStatus("「時間到」提醒視窗已自動關閉。", 1500);
+                }
+            }, durationMs);
+        }
+        // --- 分鐘提醒功能 結束 ---
+
+
+        // 其他 DOM 元素
+        const timerWrapper = document.getElementById('timer-wrapper');
+        const timerMain = document.getElementById('timer-main');
+        const topInfo = document.getElementById('top-info');
+        const fullscreenBtn = document.getElementById('fullscreen-btn');
+        const currentInfoName = document.getElementById('current-info-name');
+        const currentInfoTime = document.getElementById('current-info-time');
+        const nextInfoName = document.getElementById('next-info-name');
+        const nextInfoTime = document.getElementById('next-info-time');
+        const statusText = document.getElementById('status-text');
+        const refreshBtn = document.getElementById('refresh-btn');
+
+
+        // --- 密碼保護功能 (保持不變) ---
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') {
+                checkPassword();
+            }
+        }
+
+        function showPasswordModal() {
+            passwordInput.value = '';
+            passwordInput.disabled = false;
+            modalError.style.display = 'none';
+            let countdown = 30;
+
+            modalCountdown.textContent = `剩餘時間: ${countdown} 秒`;
+            modalOverlay.style.display = 'flex';
+            passwordInput.focus();
+
+            modalTimeout = setTimeout(() => {
+                hidePasswordModal(true);
+            }, 30000);
+
+            modalCountdownInterval = setInterval(() => {
+                countdown--;
+                if (countdown >= 0) {
+                    modalCountdown.textContent = `剩餘時間: ${countdown} 秒`;
+                }
+            }, 1000);
+
+            passwordInput.addEventListener('keypress', handleKeyPress);
+        }
+
+        function hidePasswordModal(isTimeout = false) {
+            clearTimeout(modalTimeout);
+            clearInterval(modalCountdownInterval);
+            modalOverlay.style.display = 'none';
+            passwordInput.removeEventListener('keypress', handleKeyPress);
+
+            if (isTimeout) {
+                showStatus("🚫 密碼輸入超時，已跳回原畫面。", 3000);
+            }
+        }
+
+        function checkPassword() {
+            const input = passwordInput.value;
+
+            if (input === PASSWORD) {
+                hidePasswordModal();
+                window.open(SPREADSHEET_URL, '_blank');
+            } else {
+                passwordInput.disabled = true;
+                modalError.textContent = "密碼錯誤！3 秒後自動跳回原畫面。";
+                modalError.style.display = 'block';
+
+                setTimeout(() => {
+                    hidePasswordModal();
+                    showStatus("❌ 密碼錯誤，已跳回原畫面。", 3000);
+                    passwordInput.disabled = false;
+                }, 3000);
+            }
+        }
+        // --- 密碼保護功能結束 ---
+
+        function reEnableRefresh(success) {
+            refreshBtn.disabled = false;
+            refreshBtn.textContent = '重新整理 (數據)';
+            if (!success) {
+                refreshBtn.textContent = '載入失敗! 請重試';
+                setTimeout(() => { refreshBtn.textContent = '重新整理 (數據)'; }, 3000);
+            } else {
+                showStatus("數據載入成功！", 1500);
+            }
+        }
+
+        function showStatus(message, duration = 3000) {
+            statusText.textContent = message;
+            statusText.style.display = 'inline';
+            setTimeout(() => {
+                statusText.style.display = 'none';
+            }, duration);
+        }
+
+        function formatTime(seconds) {
+            if (seconds < 0) seconds = 0;
+            const totalMinutes = Math.floor(seconds / 60);
+            const secs = seconds % 60;
+            return `${totalMinutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        function updateRealTime() {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = (now.getMonth() + 1).toString().padStart(2, '0');
+            const day = now.getDate().toString().padStart(2, '0');
+            const weekdayIndex = now.getDay();
+            const weekdays = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+            const weekday = weekdays[weekdayIndex];
+            const timeString = now.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+
+            topInfo.textContent = `當前:${year}/${month}/${day}/${weekday}/${timeString}`;
+        }
+
+        function updateCountdownDisplay() {
+            timerMain.textContent = formatTime(remainingSeconds);
+
+            timerWrapper.classList.remove('green-alert', 'yellow-alert', 'critical', 'border-white', 'border-orange');
+
+            // --- 分鐘提醒檢查 (提前 5 秒) ---
+            const triggerPoints = {
+                305: 5,
+                185: 3,
+                65: 1
+            };
+
+            if (triggerPoints[remainingSeconds] !== undefined) {
+                const minutes = triggerPoints[remainingSeconds];
+                triggerTimeAlert('minutes', minutes);
+            }
+            // --- 分鐘提醒檢查結束 ---
+
+
+            if (remainingSeconds > 300) {
+                // > 5 分鐘: 預設白色
+            } else if (remainingSeconds > 180) {
+                // 3 - 5 分鐘: 綠色
+                timerWrapper.classList.add('green-alert');
+            } else if (remainingSeconds > 60) {
+                // 1 - 3 分鐘: 黃色
+                timerWrapper.classList.add('yellow-alert');
+            } else if (remainingSeconds > 0) {
+                // <= 60 秒: 紅色 + 邊框閃爍
+                timerWrapper.classList.add('critical');
+
+                if (remainingSeconds % 2 === 0) {
+                    timerWrapper.classList.add('border-white');
+                } else {
+                    timerWrapper.classList.add('border-orange');
+                }
+
+            } else {
+                // **時間到: remainingSeconds <= 0**
+                timerWrapper.classList.add('critical');
+
+                clearInterval(countdownInterval); // 停止當前課程計時
+                clearInterval(nextCountdownInterval); // 停止可能的下一堂計時
+
+                // 顯示頂部的手動關閉提醒按鈕
+                document.getElementById('advance-schedule-btn').style.display = 'inline-block';
+
+                // 觸發「時間到」提醒 (保持 2 分鐘，但不控制排程)
+                triggerTimeAlert('end', null);
+
+                // **[修正] 立即載入下一程序**
+                showStatus("課程時間到！立即載入下一堂課...", 1500);
+                loadSchedule();
+
+                // 雖然 loadSchedule 會在背景啟動下一段排程，但我們將主計時器顯示為 00:00，直到新的排程數據回來。
+                timerMain.textContent = "00:00";
+                remainingSeconds = 0;
+            }
+        }
+
+        function countdown() {
+            remainingSeconds--;
+            updateCountdownDisplay();
+        }
+
+        function handleSchedule(info) {
+            console.log("排程資訊:", info);
+            currentScheduleInfo = info; // **儲存排程資訊**
+            reEnableRefresh(true);
+
+            // 載入成功，確保清除所有計時器
+            clearInterval(nextCountdownInterval);
+            clearInterval(countdownInterval);
+
+            if (info.current) {
+                currentInfoName.textContent = `課程/講師: ${info.current.name} / ${info.current.speaker}`;
+                currentInfoTime.textContent = `時間: ${info.current.start} - ${info.current.end}`;
+
+                remainingSeconds = info.current.remainingSeconds;
+
+                if (remainingSeconds > 0) {
+                    updateCountdownDisplay();
+                    countdownInterval = setInterval(countdown, 1000);
+                    timerWrapper.style.display = 'inline-block';
+                } else {
+                    // 課程剛結束 (但排程已前進)，保留資訊
+                    updateCountdownDisplay();
+                    // [修正] 保留 currentInfoName/Time 的內容，不覆蓋
+                }
+
+            } else {
+                // 非課程時間
+                timerWrapper.style.display = 'none';
+                currentInfoName.textContent = info.status === 'FINISHED' ? "課程/講師: 本日課程已結束" : "課程/講師: 課間休息 / 尚未開始";
+                currentInfoTime.textContent = "";
+                timerWrapper.classList.remove('critical');
+                timerWrapper.classList.remove('border-white', 'border-orange');
+            }
+
+            // **更新下一堂課程資訊**
+            if (info.next) {
+                nextInfoName.textContent = `課程/講師: ${info.next.name} / ${info.next.speaker}`;
+                nextInfoTime.textContent = `時間: ${info.next.start} - ${info.next.end}`;
+            } else if (info.status === 'FINISHED') {
+                nextInfoName.textContent = "課程/講師: 今日所有課程已結束。";
+                nextInfoTime.textContent = "";
+            } else {
+                nextInfoName.textContent = "課程/講師: 無排程或正在等待下一輪載入";
+                nextInfoTime.textContent = "";
+            }
+        }
+
+        function handleFailure(error) {
+            reEnableRefresh(false);
+            document.getElementById('advance-schedule-btn').style.display = 'none';
+            currentInfoName.textContent = "課程/講師: 錯誤！請檢查試算表";
+            currentInfoTime.textContent = "時間: 詳情請見控制台 (Console)";
+            nextInfoName.textContent = "課程/講師: 載入失敗！";
+            nextInfoName.textContent = "時間: --:-- - --:--";
+            timerMain.textContent = "FAIL";
+            timerWrapper.style.display = 'inline-block';
+            showStatus("❌ 載入排程失敗！", 5000);
+            console.error("載入排程失敗:", error);
+        }
+
+        function loadSchedule() {
+            refreshBtn.disabled = true;
+            refreshBtn.textContent = '載入中...';
+            showStatus("正在重新載入數據...", 1500);
+
+            google.script.run
+                .withSuccessHandler(handleSchedule)
+                .withFailureHandler(handleFailure)
+                .getScheduleInfo();
+        }
+
+        function toggleFullScreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen();
+                fullscreenBtn.textContent = "離開全螢幕(F11)";
+            } else {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                    fullscreenBtn.textContent = "全螢幕顯示(F11)";
+                }
+            }
+        }
+
+        document.addEventListener('fullscreenchange', function() {
+            if (!document.fullscreenElement) {
+                fullscreenBtn.textContent = "全螢幕顯示(F11)";
+            } else {
+                fullscreenBtn.textContent = "離開全螢幕(F11)";
+            }
+        });
+
+
+        window.onload = function() {
+            updateRealTime();
+            realTimeInterval = setInterval(updateRealTime, 1000);
+
+            loadSchedule();
+            // 設定每 30 分鐘自動重新載入排程 (1800000ms)
+            setInterval(loadSchedule, 1800000);
+        };
+
+    </script>
+</body>
+</html>
