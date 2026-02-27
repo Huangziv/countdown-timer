@@ -2,6 +2,9 @@
 <html>
 <head>
     <base target="_top">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>三重視聽倒數計時系統</title>
     <style>
         body {
             display: flex; flex-direction: column; height: 100vh; margin: 0;
@@ -103,6 +106,8 @@
     </div>
 
     <script>
+        // ★ 核心設定：您的 Google Apps Script 部署網址 ★
+        const API_URL = "https://script.google.com/macros/s/AKfycbyVkpkIiltM-qHnlbB62QAIgwQr4m2DsqJ12mSIeIsk1YcLRk9DAtKXvAERS3pnWwQHDg/exec";
         const SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/1TGkgxqP1litJyu0U4VA0v2paDprZtCOQK5RtQ0QofWY/edit";
         const PASSWORD = "94800552";
 
@@ -120,45 +125,67 @@
             return (h2 * 60 + m2) - (h1 * 60 + m1);
         }
 
+        // 修改後的讀取函式：使用 Fetch API
         function loadSchedule() {
             if (updateStatus !== "連線失敗") updateStatus = "讀取中...";
             updateFooterStatus();
             
-            if (typeof google !== 'undefined') {
-                google.script.run
-                .withSuccessHandler(data => {
-                    updateStatus = "成功";
-                    if (data && data.current) {
-                        document.getElementById('curr-name').textContent = data.current.name;
-                        document.getElementById('curr-speaker').textContent = data.current.speaker;
-                        const duration = t2m(data.current.start, data.current.end);
-                        document.getElementById('curr-time').textContent = `${data.current.start} - ${data.current.end} (${duration}Min)`;
-                        
-                        if (data.current.remainingSeconds <= 0 && data.next && data.next.remainingSecondsToStart > 0) {
-                            isPreroll = true;
-                            remainingSeconds = data.next.remainingSecondsToStart;
-                        } else {
-                            isPreroll = false;
-                            remainingSeconds = data.current.remainingSeconds;
-                        }
-                        
-                        clearInterval(countdownInterval);
-                        updateTimerDisplay();
-                        countdownInterval = setInterval(() => {
-                            if (remainingSeconds > 0) { remainingSeconds--; updateTimerDisplay(); }
-                            else { loadSchedule(); }
-                        }, 1000);
+            // 加上時間戳記避免瀏覽器快取
+            fetch(`${API_URL}?t=${new Date().getTime()}`)
+            .then(response => response.json())
+            .then(data => {
+                updateStatus = "成功";
+                handleData(data);
+                updateFooterStatus();
+            })
+            .catch(err => {
+                console.error("Fetch Error:", err);
+                updateStatus = "連線失敗";
+                updateFooterStatus();
+            });
+        }
+
+        function handleData(data) {
+            // 清除現有計時
+            clearInterval(countdownInterval);
+
+            if (data && data.current) {
+                document.getElementById('curr-name').textContent = data.current.name;
+                document.getElementById('curr-speaker').textContent = data.current.speaker;
+                const duration = t2m(data.current.start, data.current.end);
+                document.getElementById('curr-time').textContent = `${data.current.start} - ${data.current.end} (${duration}Min)`;
+                
+                remainingSeconds = data.current.remainingSeconds;
+                isPreroll = data.current.isPreroll || false;
+                
+                updateTimerDisplay();
+                countdownInterval = setInterval(() => {
+                    if (remainingSeconds > 0) { 
+                        remainingSeconds--; 
+                        updateTimerDisplay(); 
+                    } else { 
+                        loadSchedule(); 
                     }
-                    if (data && data.next) {
-                        document.getElementById('next-name').textContent = data.next.name;
-                        document.getElementById('next-speaker').textContent = data.next.speaker;
-                        const nextDuration = t2m(data.next.start, data.next.end);
-                        document.getElementById('next-time').textContent = `${data.next.start} - ${data.next.end} (${nextDuration}Min)`;
-                    }
-                    updateFooterStatus();
-                })
-                .withFailureHandler(() => { updateStatus = "連線失敗"; updateFooterStatus(); })
-                .getScheduleInfo();
+                }, 1000);
+            } else {
+                // 無進行中也無預備中的課程
+                document.getElementById('curr-name').textContent = "暫無課程";
+                document.getElementById('curr-speaker').textContent = "--";
+                document.getElementById('curr-time').textContent = "--:-- - --:--";
+                document.getElementById('timer-main').textContent = "00:00";
+                remainingSeconds = 0;
+                isPreroll = false;
+            }
+
+            if (data && data.next) {
+                document.getElementById('next-name').textContent = data.next.name;
+                document.getElementById('next-speaker').textContent = data.next.speaker;
+                const nextDuration = t2m(data.next.start, data.next.end);
+                document.getElementById('next-time').textContent = `${data.next.start} - ${data.next.end} (${nextDuration}Min)`;
+            } else {
+                document.getElementById('next-name').textContent = "今日課程結束";
+                document.getElementById('next-speaker').textContent = "--";
+                document.getElementById('next-time').textContent = "--:-- - --:--";
             }
         }
 
@@ -168,14 +195,22 @@
             const timerEl = document.getElementById('timer-main');
             timerEl.textContent = m.toString().padStart(2, '0') + ":" + s.toString().padStart(2, '0');
             
-            if (isPreroll) { timerEl.className = 'mode-preroll'; }
-            else if (remainingSeconds < 60 && remainingSeconds > 0) { timerEl.className = 'timer-flash-red'; }
-            else { timerEl.className = ''; timerEl.style.color = "white"; }
+            if (isPreroll) { 
+                timerEl.className = 'mode-preroll'; 
+            } else if (remainingSeconds < 60 && remainingSeconds > 0) { 
+                timerEl.className = 'timer-flash-red'; 
+            } else { 
+                timerEl.className = ''; 
+                timerEl.style.color = "white"; 
+            }
             
+            // 提醒觸發邏輯
             if (!isPreroll) {
                 const pts = { 900:15, 300:5, 180:3, 60:1 };
                 if (pts[remainingSeconds]) triggerTimeAlert('minutes', pts[remainingSeconds]);
-                if (remainingSeconds === 0) triggerTimeAlert('end', '');
+                if (remainingSeconds === 0 && countdownInterval) {
+                    triggerTimeAlert('end', '');
+                }
             }
         }
 
@@ -190,33 +225,57 @@
             clearInterval(alertFlashInterval);
             let isYellow = true;
             alertFlashInterval = setInterval(() => { display.className = isYellow ? 'flash-yellow' : 'flash-white'; isYellow = !isYellow; }, 500);
+            clearTimeout(alertTimeout);
             alertTimeout = setTimeout(closeAlert, type === 'end' ? 180000 : 10000);
         }
 
         function closeAlert() { document.getElementById('time-alert-box').style.display = 'none'; clearInterval(alertFlashInterval); }
+        
         function updateClock() {
             const now = new Date();
             document.getElementById('top-date').textContent = now.toLocaleDateString('zh-TW', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
             document.getElementById('top-time').textContent = now.toLocaleTimeString('zh-TW', { hour12: false });
         }
+        
         function updateFooterStatus() {
             const isFS = !!(document.fullscreenElement || document.webkitFullscreenElement);
-            document.getElementById('footer-info').innerHTML = `三重視聽 Ver. 2026.01.11 | 自動提醒：${alertsEnabled ? '開啟' : '關閉'} | 數據更新：${updateStatus} | 全螢幕：${isFS ? '開啟' : '關閉'}`;
+            document.getElementById('footer-info').innerHTML = `三重視聽 Ver. 2026.02.27 | 自動提醒：${alertsEnabled ? '開啟' : '關閉'} | 數據更新：${updateStatus} | 全螢幕：${isFS ? '開啟' : '關閉'}`;
             document.getElementById('alert-toggle-btn').style.backgroundColor = alertsEnabled ? "#1abc9c" : "#7f8c8d";
         }
+        
         function toggleAlerts() { alertsEnabled = !alertsEnabled; if(!alertsEnabled) closeAlert(); updateFooterStatus(); }
+        
         function toggleFullScreen() {
             const elem = document.documentElement;
-            if (!document.fullscreenElement) { if (elem.requestFullscreen) elem.requestFullscreen(); } else { document.exitFullscreen(); }
+            if (!document.fullscreenElement) { 
+                if (elem.requestFullscreen) elem.requestFullscreen(); 
+                else if (elem.webkitRequestFullscreen) elem.webkitRequestFullscreen();
+            } else { 
+                if (document.exitFullscreen) document.exitFullscreen(); 
+            }
         }
+        
         function showPasswordModal() { document.getElementById('password-modal-overlay').style.display = 'flex'; }
         function hidePasswordModal() { document.getElementById('password-modal-overlay').style.display = 'none'; }
+        
         function checkPassword() {
-            if (document.getElementById('password-input').value === PASSWORD) { window.open(SPREADSHEET_URL, '_blank'); hidePasswordModal(); }
-            else { alert("密碼錯誤！"); }
+            if (document.getElementById('password-input').value === PASSWORD) { 
+                window.open(SPREADSHEET_URL, '_blank'); 
+                hidePasswordModal(); 
+            } else { 
+                alert("密碼錯誤！"); 
+            }
         }
 
-        window.onload = () => { setInterval(updateClock, 1000); loadSchedule(); updateFooterStatus(); setInterval(() => { if (updateStatus !== "讀取中") loadSchedule(); }, 30000); };
+        window.onload = () => { 
+            setInterval(updateClock, 1000); 
+            loadSchedule(); 
+            updateFooterStatus(); 
+            // 每 30 秒自動同步數據
+            setInterval(() => { if (updateStatus !== "讀取中") loadSchedule(); }, 30000); 
+            document.addEventListener('fullscreenchange', updateFooterStatus);
+            document.addEventListener('webkitfullscreenchange', updateFooterStatus);
+        };
     </script>
 </body>
 </html>
