@@ -229,7 +229,7 @@
             let isYellow = true;
             alertFlashInterval = setInterval(() => { display.className = isYellow ? 'flash-yellow' : 'flash-white'; isYellow = !isYellow; }, 500);
             clearTimeout(alertTimeout);
-            alertTimeout = setTimeout(closeAlert, type === 'end' ? 180000 : 10000);
+            alertTimeout = setTimeout(closeAlert, type === 'end' ? 90000 : 10000);
         }
 
         function closeAlert() { document.getElementById('time-alert-box').style.display = 'none'; clearInterval(alertFlashInterval); }
