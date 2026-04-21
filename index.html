@@ -46,7 +46,6 @@
         .status-dot.error { background: var(--danger); }
         #sync-countdown { color: #888; font-size: 0.85rem; margin-left: 2px; font-variant-numeric: tabular-nums; width: 25px; text-align: right; }
 
-        /* 顯示目前抓取到的試算表設定，方便除錯 */
         #debug-msg {
             color: var(--warning);
             font-size: 0.95rem;
@@ -56,7 +55,6 @@
             font-weight: bold;
         }
 
-        /* 計時器主區塊 */
         .timer-wrap { 
             flex-grow: 1; display: flex; justify-content: center; align-items: center; 
             min-height: 0; 
@@ -70,7 +68,6 @@
             cursor: pointer; 
         }
 
-        /* 下方課堂資訊卡片 */
         .footer-grid { 
             display: grid; grid-template-columns: 1fr 1fr; gap: 20px; 
             z-index: 2; flex-shrink: 0; 
@@ -110,7 +107,6 @@
         @keyframes flash { 50% { opacity: 0.1; } }
         @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
 
-        /* 🌟 全螢幕紅色閃爍提醒 (版面重新配置) 🌟 */
         #alert-screen {
             position: fixed; top:0; left:0; width: 100%; height:100%;
             background: var(--danger); z-index: 9999; display: none;
@@ -118,7 +114,6 @@
             animation: bg-pulse 1s infinite alternate;
             text-align: center;
         }
-        /* 第一行：提醒您/你 */
         #alert-sub { 
             font-size: 4.5rem; 
             font-weight: bold; 
@@ -126,17 +121,15 @@
             letter-spacing: 5px;
             text-shadow: 0 5px 20px rgba(0,0,0,0.5); 
         }
-        /* 第二行：加大加粗的時間狀態 */
         #alert-msg { 
-            font-size: 13vw; /* 使用畫面寬度比例，字體超巨大 */
+            font-size: 13vw; 
             margin: 0; 
-            font-weight: 900; /* 最粗體 */
+            font-weight: 900; 
             text-shadow: 0 10px 30px rgba(0,0,0,0.5); 
             line-height: 1.1; 
         }
         @keyframes bg-pulse { from { background: #ff4d4d; } to { background: #cc0000; } }
 
-        /* 右下角版本與後台連結 */
         .bottom-right-info {
             display: flex;
             justify-content: flex-end;
@@ -221,7 +214,7 @@
     </div>
 
     <div class="bottom-right-info">
-        <span>三重視聽 Ver. 2.7 (提醒優化版)</span>
+        <span>三重視聽 Ver. 2.8 (極速同步版)</span>
         <a href="https://docs.google.com/spreadsheets/d/1ynJaZK2OXOChlMo0eQ2Y5ZTWD1EV0Xwm3_8oty6Rmd8/edit" target="_blank">⚙️ 後台連結</a>
     </div>
 
@@ -241,10 +234,8 @@
         let triggeredAlerts = new Set();
         let alertTimeout = null; 
 
-        // 控制開關與閃爍秒數
         let courseAlertEn = false;
         let alertDisplayDuration = 5000; 
-        
         let courseZeroEn = false;
         let zeroDisplayDuration = 5000;  
 
@@ -253,7 +244,6 @@
         function initHall() {
             const urlParams = new URLSearchParams(window.location.search);
             if (urlParams.has('hall')) currentHall = urlParams.get('hall');
-            
             document.getElementById('hall-selector').value = currentHall;
             document.getElementById('display-hall-name').textContent = "📍 " + currentHall;
         }
@@ -281,13 +271,11 @@
 
         async function fetchSync() {
             updateSyncUI('loading', `正在同步...`);
-
             try {
                 const fetchUrl = API_BASE_URL + "?hall=" + encodeURIComponent(currentHall);
                 const response = await fetch(fetchUrl, { redirect: 'follow' });
                 const rawText = await response.text();
                 let data;
-                
                 try {
                     data = JSON.parse(rawText);
                 } catch (parseErr) {
@@ -299,7 +287,6 @@
                     if (data.current) {
                         remainSeconds = Number(data.current.remainingSeconds) || 0;
                         if (isNaN(remainSeconds)) remainSeconds = 0;
-
                         isPreroll = data.current.isPreroll;
                         
                         courseAlertEn = !!data.current.alertEn;
@@ -314,6 +301,7 @@
                         let zeroStatus = courseZeroEn ? `開(閃${zeroDisplayDuration/1000}s)` : `關`;
                         document.getElementById('debug-msg').textContent = `倒數10/5/3: ${alertStatus} | 0分提醒: ${zeroStatus}`;
 
+                        // 🌟 切換下一階段課程時，清空記憶並立即觸發檢查 🌟
                         if (data.current.name !== currentCourseName) {
                             currentCourseName = data.current.name;
                             triggeredAlerts.clear(); 
@@ -325,16 +313,12 @@
                         document.getElementById('cur-time').textContent = `${data.current.start} - ${data.current.end} (${duration}Min)`;
                     } else {
                         remainSeconds = 0;
-                        if (currentCourseName !== "") {
-                            currentCourseName = "";
-                            triggeredAlerts.clear();
-                        }
+                        if (currentCourseName !== "") { currentCourseName = ""; triggeredAlerts.clear(); }
                         isPreroll = false;
-
                         document.getElementById('cur-name').textContent = "--";
                         document.getElementById('cur-speaker').textContent = "--";
                         document.getElementById('cur-time').textContent = "--:-- - --:-- (--Min)";
-                        document.getElementById('debug-msg').textContent = "目前無課程，不觸發提醒";
+                        document.getElementById('debug-msg').textContent = "目前無課程";
                     }
 
                     if (data.next) {
@@ -350,7 +334,7 @@
                     
                     updateSyncUI('success', "雲端同步成功");
                     updateTimerDisplay();
-                    checkAlertTrigger();
+                    checkAlertTrigger(); // 🌟 同步完立刻檢查一次提醒 🌟
                 } else {
                     updateSyncUI('error', "無法讀取排程");
                 }
@@ -371,24 +355,22 @@
         function checkAlertTrigger() {
             if (isPreroll || currentCourseName === "") return;
 
-            // 1. 時間到提醒：固定 0 分 0 秒觸發
+            // 1. 🌟 時間到提醒修復：改為小於等於 0 秒即觸發，確保不漏接 🌟
             if (courseZeroEn) {
-                if (remainSeconds === 0 && !triggeredAlerts.has('ZERO')) {
+                if (remainSeconds <= 0 && !triggeredAlerts.has('ZERO')) {
                     triggeredAlerts.add('ZERO');
-                    // 🌟 修改文案：第一行「提醒你」，第二行「時間到」
                     showAlert("時間到", "提醒您", zeroDisplayDuration);
                 }
             } 
             
-            // 2. 倒數提醒：固定 10分(600), 5分(300), 3分(180) 觸發
+            // 2. 🌟 倒數提醒修復：增加判定範圍(20秒)，確保同步跳秒時也能捕捉到 🌟
             if (courseAlertEn && remainSeconds > 0) {
                 const fixedTargets = [600, 300, 180]; 
-                
                 for (let targetSeconds of fixedTargets) {
-                    if (remainSeconds <= targetSeconds && remainSeconds > targetSeconds - 5) {
+                    // 若剩餘時間低於目標且在 20 秒緩衝內，且該課程尚未提醒過
+                    if (remainSeconds <= targetSeconds && remainSeconds > (targetSeconds - 20)) {
                         if (!triggeredAlerts.has(`ALERT_${targetSeconds}`)) {
                             triggeredAlerts.add(`ALERT_${targetSeconds}`);
-                            // 🌟 修改文案：第一行「提醒您」，第二行「剩下 X 分/秒」
                             showAlert("剩下 " + formatTimeText(targetSeconds), "提醒您", alertDisplayDuration);
                         }
                     }
@@ -398,22 +380,18 @@
 
         function updateTimerDisplay() {
             if (isNaN(remainSeconds)) remainSeconds = 0;
-
             const m = Math.floor(remainSeconds / 60);
             const s = remainSeconds % 60;
             const timerEl = document.getElementById('main-timer');
-            
             if (currentCourseName === "") {
                 timerEl.textContent = "00:00";
                 timerEl.className = "";
                 timerEl.style.color = "#444"; 
                 return;
             }
-
             timerEl.textContent = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
             timerEl.className = ""; 
             timerEl.style.color = ""; 
-
             if (isPreroll) {
                 timerEl.classList.add('text-blue');
             } else if (remainSeconds > 0 && remainSeconds <= 60) {
@@ -421,25 +399,18 @@
             }
         }
 
-        // 修改 showAlert 傳入參數：msg 變成第二行超大字體，subText 變成第一行副標題
         function showAlert(msg, subText, durationMs = 5000) {
             const screen = document.getElementById('alert-screen');
-            // 注意！HTML 已經反轉，alert-msg 對應到超大標題(h1)，alert-sub 對應到上方文字(p)
             document.getElementById('alert-msg').textContent = msg;
             document.getElementById('alert-sub').textContent = subText;
             screen.style.display = 'flex';
-            
             if (alertTimeout) clearTimeout(alertTimeout);
-            
-            alertTimeout = setTimeout(() => { 
-                screen.style.display = 'none'; 
-            }, durationMs);
+            alertTimeout = setTimeout(() => { screen.style.display = 'none'; }, durationMs);
         }
 
         function updateSyncUI(status, text) {
             const dot = document.getElementById('status-dot');
             document.getElementById('status-text').textContent = text;
-            
             dot.className = "status-dot"; 
             if (status === 'loading') dot.classList.add('loading');
             if (status === 'error') dot.classList.add('error');
@@ -448,33 +419,21 @@
         window.onload = () => {
             initHall(); 
             setInterval(tickClock, 1000);
-            
             setInterval(() => {
-                if (remainSeconds > 0) {
-                    remainSeconds--;
-                }
-                
+                if (remainSeconds > 0) { remainSeconds--; }
                 updateTimerDisplay();
                 checkAlertTrigger(); 
-
                 syncTimer--;
                 document.getElementById('sync-countdown').textContent = `(${syncTimer}s)`;
-                if (syncTimer <= 0) {
-                    syncTimer = 5; 
-                    fetchSync();
-                }
+                if (syncTimer <= 0) { syncTimer = 5; fetchSync(); }
             }, 1000);
-
             fetchSync();
             document.getElementById('sync-countdown').textContent = `(${syncTimer}s)`;
-
             document.body.ondblclick = (e) => {
                 if (e.target.tagName.toLowerCase() === 'select' || e.target.tagName.toLowerCase() === 'option') return;
                 if (!document.fullscreenElement) document.documentElement.requestFullscreen();
                 else document.exitFullscreen();
             };
-
-            // 點擊中間數字測試「紅色閃爍提醒」
             document.getElementById('main-timer').onclick = () => {
                 showAlert("剩下 10 分鐘", "提醒您", 3000);
             };
