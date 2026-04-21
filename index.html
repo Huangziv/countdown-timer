@@ -44,6 +44,7 @@
         .status-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--success); }
         .status-dot.loading { background: var(--warning); animation: pulse 1s infinite; }
         .status-dot.error { background: var(--danger); }
+        #sync-countdown { color: #888; font-size: 0.85rem; margin-left: 2px; font-variant-numeric: tabular-nums; width: 25px; text-align: right; }
 
         #debug-msg {
             color: var(--warning);
@@ -116,6 +117,35 @@
         }
         #alert-screen h1 { font-size: 18vw; margin: 0; text-shadow: 0 10px 30px rgba(0,0,0,0.5); }
         @keyframes bg-pulse { from { background: #ff4d4d; } to { background: #cc0000; } }
+
+        /* 右下角版本與後台連結 */
+        .bottom-right-info {
+            position: fixed;
+            right: 20px;
+            bottom: 15px;
+            text-align: right;
+            font-size: 0.9rem;
+            color: #888;
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .bottom-right-info a {
+            color: var(--info-blue);
+            text-decoration: none;
+            padding: 5px 10px;
+            background: #1e1f22;
+            border-radius: 6px;
+            border: 1px solid #333;
+            transition: 0.2s;
+            font-weight: bold;
+        }
+        .bottom-right-info a:hover {
+            border-color: var(--info-blue);
+            color: white;
+            background: #2b2d31;
+        }
     </style>
 </head>
 <body>
@@ -137,6 +167,7 @@
                 <div class="sync-tag" id="sync-container">
                     <div id="status-dot" class="status-dot"></div>
                     <span id="status-text">系統啟動中</span>
+                    <span id="sync-countdown"></span>
                 </div>
             </div>
             <div id="debug-msg"></div> 
@@ -179,6 +210,12 @@
         <p id="alert-sub" style="font-size: 3.5rem; font-weight: bold; margin-top: -20px;">時間提醒</p>
     </div>
 
+    <!-- 右下角資訊 -->
+    <div class="bottom-right-info">
+        <span>三重視聽 Ver. 2.0</span>
+        <a href="https://docs.google.com/spreadsheets/d/1ynJaZK2OXOChlMo0eQ2Y5ZTWD1EV0Xwm3_8oty6Rmd8/edit" target="_blank">⚙️ 後台連結</a>
+    </div>
+
     <script>
         // 您最新的 API 網址
         const API_BASE_URL = "https://script.google.com/macros/s/AKfycbwJUwQeV3ObeBNl0OjTrGj5KYS7Q5M4dXuHjzIeuii6_83EInwJwnncKlz7Ly5ojbMS/exec"; 
@@ -193,6 +230,8 @@
         let courseAlertVals = [];
         let courseZeroEn = false;
         let courseZeroVal = 0;
+
+        let syncTimer = 5; // 同步倒數計時器 (5秒)
 
         function initHall() {
             const urlParams = new URLSearchParams(window.location.search);
@@ -225,7 +264,7 @@
         }
 
         async function fetchSync() {
-            updateSyncUI('loading', `正在同步資料...`, "");
+            updateSyncUI('loading', `正在同步...`, "");
 
             try {
                 const fetchUrl = API_BASE_URL + "?hall=" + encodeURIComponent(currentHall);
@@ -374,7 +413,9 @@
             initHall(); 
             setInterval(tickClock, 1000);
             
+            // 將計時與同步整合進每秒執行的迴圈中
             setInterval(() => {
+                // 主計時器倒數
                 if (remainSeconds > 0) {
                     remainSeconds--;
                     updateTimerDisplay();
@@ -382,10 +423,19 @@
                 } else if (remainSeconds === 0) {
                     checkAlertTrigger(); 
                 }
+
+                // 同步倒數處理 (每5秒向雲端抓取一次資料)
+                syncTimer--;
+                document.getElementById('sync-countdown').textContent = `(${syncTimer}s)`;
+                if (syncTimer <= 0) {
+                    syncTimer = 5; // 重置秒數
+                    fetchSync();
+                }
             }, 1000);
 
+            // 第一次載入時立刻同步
             fetchSync();
-            setInterval(fetchSync, 15000);
+            document.getElementById('sync-countdown').textContent = `(${syncTimer}s)`;
 
             document.body.ondblclick = (e) => {
                 if (e.target.tagName.toLowerCase() === 'select' || e.target.tagName.toLowerCase() === 'option') return;
