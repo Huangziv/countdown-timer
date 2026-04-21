@@ -7,6 +7,7 @@
     <style>
         :root {
             --bg-color: #121212;
+            --card-bg: #1e1e1e;
             --primary: #5865f2;
             --danger: #ff4d4d;
             --success: #00c853;
@@ -51,12 +52,25 @@
             text-align: right;
         }
 
+        /* 計時器主區塊 */
         .timer-wrap { flex-grow: 1; display: flex; justify-content: center; align-items: center; }
         #main-timer { 
-            font-size: 33vw; font-weight: 900; font-variant-numeric: tabular-nums;
+            font-size: 28vw; /* 稍微縮小一點以容納下方卡片 */
+            font-weight: 900; font-variant-numeric: tabular-nums;
             letter-spacing: -1vw; text-shadow: 0 0 50px rgba(0,0,0,0.8);
             transition: color 0.3s ease;
         }
+
+        /* 下方課堂資訊卡片 */
+        .footer-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 25px; margin-bottom: 10px; z-index: 2; }
+        .card { 
+            background: var(--card-bg); padding: 25px; border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5); border-left: 10px solid var(--primary);
+        }
+        .card.active { border-left-color: var(--danger); }
+        .label { color: #888; font-size: 1.1rem; text-transform: uppercase; margin-bottom: 10px; display: block; font-weight: bold; }
+        .title { font-size: 2.2rem; font-weight: bold; margin-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .detail { font-size: 1.4rem; color: #bbb; }
 
         .text-red { color: var(--danger) !important; }
         .text-blue { color: #4dabf7 !important; }
@@ -103,13 +117,27 @@
         <div id="main-timer">--:--</div>
     </div>
 
+    <!-- 恢復顯示課堂資訊的卡片區 -->
+    <div class="footer-grid">
+        <div class="card active">
+            <span class="label">🔴 當前階段 (Current)</span>
+            <div id="cur-name" class="title">等待同步...</div>
+            <div id="cur-info" class="detail">--:-- | 講師</div>
+        </div>
+        <div class="card">
+            <span class="label">▶️ 下一場預告 (Next)</span>
+            <div id="next-name" class="title">--</div>
+            <div id="next-info" class="detail">--:-- | 講師</div>
+        </div>
+    </div>
+
     <div id="alert-screen">
         <h1 id="alert-msg">05:00</h1>
         <p id="alert-sub" style="font-size: 3.5rem; font-weight: bold; margin-top: -20px;">時間提醒</p>
     </div>
 
     <script>
-        // 已經為您設定好最新的 API 網址
+        // 您最新的 API 網址
         const API_BASE_URL = "https://script.google.com/macros/s/AKfycbwJUwQeV3ObeBNl0OjTrGj5KYS7Q5M4dXuHjzIeuii6_83EInwJwnncKlz7Ly5ojbMS/exec"; 
 
         let currentHall = "講經堂";
@@ -159,8 +187,8 @@
                 }
 
                 if (data.success) {
+                    // 同步當前課程資料
                     if (data.current) {
-                        // 【防呆修復】確保一定能抓到數字，避免出現 NaN
                         remainSeconds = Number(data.current.remainingSeconds) || 0;
                         if (isNaN(remainSeconds)) remainSeconds = 0;
 
@@ -174,11 +202,28 @@
                             currentCourseName = data.current.name;
                             lastAlertTrigger = -1; 
                         }
+
+                        // 更新畫面卡片
+                        document.getElementById('cur-name').textContent = data.current.name;
+                        document.getElementById('cur-info').textContent = `${data.current.start} - ${data.current.end} | 講師: ${data.current.speaker || "無"}`;
                     } else {
                         remainSeconds = 0;
                         currentCourseName = "";
                         lastAlertTrigger = -1;
                         isPreroll = false;
+
+                        // 更新畫面卡片為無課程
+                        document.getElementById('cur-name').textContent = "目前無課程";
+                        document.getElementById('cur-info').textContent = "--:--";
+                    }
+
+                    // 同步下一場課程資料
+                    if (data.next) {
+                        document.getElementById('next-name').textContent = data.next.name;
+                        document.getElementById('next-info').textContent = `${data.next.start} - ${data.next.end} | 講師: ${data.next.speaker || "無"}`;
+                    } else {
+                        document.getElementById('next-name').textContent = "今日課程結束";
+                        document.getElementById('next-info').textContent = "--:--";
                     }
                     
                     updateSyncUI('success', "雲端同步成功", "");
@@ -224,24 +269,22 @@
         }
 
         function updateTimerDisplay() {
-            // 確保 remainSeconds 絕對不會是 NaN
             if (isNaN(remainSeconds)) remainSeconds = 0;
 
             const m = Math.floor(remainSeconds / 60);
             const s = remainSeconds % 60;
             const timerEl = document.getElementById('main-timer');
             
-            // 如果沒課程，顯示 00:00
             if (currentCourseName === "") {
                 timerEl.textContent = "00:00";
                 timerEl.className = "";
-                timerEl.style.color = "#444"; // 休息時變暗
+                timerEl.style.color = "#444"; 
                 return;
             }
 
             timerEl.textContent = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
             timerEl.className = ""; 
-            timerEl.style.color = ""; // 恢復原本顏色
+            timerEl.style.color = ""; 
 
             if (isPreroll) {
                 timerEl.classList.add('text-blue');
