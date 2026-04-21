@@ -58,8 +58,8 @@
             min-height: 0; /* 讓 flexbox 正確計算剩餘空間 */
         }
         #main-timer { 
-            font-size: min(22vw, 32vh); /* 智慧縮放：稍微調降高度佔比，預留空間給超長標題 */
-            line-height: 1; /* 消除上下多餘空白 */
+            font-size: min(32vw, 60vh); /* 🌟 極大化字體：盡可能撐滿中間的高度與寬度 🌟 */
+            line-height: 0.85; /* 🌟 壓縮字體本身的上下隱藏留白 🌟 */
             font-weight: 900; font-variant-numeric: tabular-nums;
             letter-spacing: -0.5vw; text-shadow: 0 0 50px rgba(0,0,0,0.8);
             transition: color 0.3s ease;
@@ -125,7 +125,7 @@
 
                 <div class="sync-tag" id="sync-container">
                     <div id="status-dot" class="status-dot"></div>
-                    <span id="status-text">系統啟ٹی中</span>
+                    <span id="status-text">系統啟動中</span>
                 </div>
             </div>
             <div id="debug-msg"></div> 
