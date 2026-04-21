@@ -20,7 +20,7 @@
             display: flex; flex-direction: column; overflow: hidden;
         }
 
-        .header { display: flex; justify-content: space-between; align-items: flex-start; }
+        .header { display: flex; justify-content: space-between; align-items: flex-start; flex-shrink: 0; }
         .clock-box { display: flex; flex-direction: column; }
         .hall-title { color: var(--primary); font-size: 1.5rem; font-weight: bold; margin-bottom: 5px; }
         #clock-hms { font-size: 3rem; font-weight: bold; font-variant-numeric: tabular-nums; line-height: 1; text-shadow: 0 2px 10px rgba(0,0,0,0.5); }
@@ -52,17 +52,24 @@
             text-align: right;
         }
 
-        /* 計時器主區塊 */
-        .timer-wrap { flex-grow: 1; display: flex; justify-content: center; align-items: center; }
+        /* 計時器主區塊：修復超出螢幕的問題 */
+        .timer-wrap { 
+            flex-grow: 1; display: flex; justify-content: center; align-items: center; 
+            min-height: 0; /* 讓 flexbox 正確計算剩餘空間 */
+        }
         #main-timer { 
-            font-size: 28vw; /* 稍微縮小一點以容納下方卡片 */
+            font-size: min(22vw, 40vh); /* 智慧縮放：取寬度或高度的最小值，確保不超出邊界 */
+            line-height: 1; /* 消除上下多餘空白 */
             font-weight: 900; font-variant-numeric: tabular-nums;
-            letter-spacing: -1vw; text-shadow: 0 0 50px rgba(0,0,0,0.8);
+            letter-spacing: -0.5vw; text-shadow: 0 0 50px rgba(0,0,0,0.8);
             transition: color 0.3s ease;
         }
 
-        /* 下方課堂資訊卡片 */
-        .footer-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 25px; margin-bottom: 10px; z-index: 2; }
+        /* 下方課堂資訊卡片：設定不被擠壓 */
+        .footer-grid { 
+            display: grid; grid-template-columns: 1fr 1fr; gap: 25px; 
+            margin-bottom: 10px; z-index: 2; flex-shrink: 0; /* 禁止被擠壓 */
+        }
         .card { 
             background: var(--card-bg); padding: 25px; border-radius: 20px;
             box-shadow: 0 10px 30px rgba(0,0,0,0.5); border-left: 10px solid var(--primary);
