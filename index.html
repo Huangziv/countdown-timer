@@ -54,13 +54,13 @@
             text-align: right;
         }
 
-        /* 🌟 計時器主區塊：置中並限制最大高度，避免壓到下方卡片 🌟 */
+        /* 計時器主區塊 */
         .timer-wrap { 
             flex-grow: 1; display: flex; justify-content: center; align-items: center; 
             min-height: 0; 
         }
         #main-timer { 
-            font-size: min(35vw, 55vh); /* 將高度限制在 55vh，保留足夠空間給卡片 */
+            font-size: min(35vw, 55vh); 
             line-height: 0.9; 
             font-weight: 900; font-variant-numeric: tabular-nums;
             letter-spacing: -0.5vw; text-shadow: 0 0 50px rgba(0,0,0,0.8);
@@ -117,7 +117,7 @@
         #alert-screen h1 { font-size: 18vw; margin: 0; text-shadow: 0 10px 30px rgba(0,0,0,0.5); }
         @keyframes bg-pulse { from { background: #ff4d4d; } to { background: #cc0000; } }
 
-        /* 🌟 右下角版本與後台連結 (改為跟隨排版，絕對不遮擋卡片) 🌟 */
+        /* 右下角版本與後台連結 */
         .bottom-right-info {
             display: flex;
             justify-content: flex-end;
@@ -175,7 +175,6 @@
         <div id="main-timer">--:--</div>
     </div>
 
-    <!-- 資訊卡片區塊 -->
     <div class="footer-grid">
         <div class="card">
             <div class="card-header current-header">
@@ -202,9 +201,8 @@
         </div>
     </div>
 
-    <!-- 底部版本資訊區塊 -->
     <div class="bottom-right-info">
-        <span>三重視聽 Ver. 2.1</span>
+        <span>三重視聽 Ver. 2.5 (終極提醒版)</span>
         <a href="https://docs.google.com/spreadsheets/d/1ynJaZK2OXOChlMo0eQ2Y5ZTWD1EV0Xwm3_8oty6Rmd8/edit" target="_blank">⚙️ 後台連結</a>
     </div>
 
@@ -214,7 +212,6 @@
     </div>
 
     <script>
-        // 您最新的 API 網址
         const API_BASE_URL = "https://script.google.com/macros/s/AKfycbwJUwQeV3ObeBNl0OjTrGj5KYS7Q5M4dXuHjzIeuii6_83EInwJwnncKlz7Ly5ojbMS/exec"; 
 
         let currentHall = "講經堂";
@@ -222,15 +219,17 @@
         let isPreroll = false;
         let currentCourseName = "";
         
-        // 🌟 核心修復：使用 Set 來記憶已經觸發過的提醒，確保萬無一失 🌟
         let triggeredAlerts = new Set();
+        let alertTimeout = null; 
 
+        // 🌟 變數：後台的 Y/N 開關與閃爍顯示秒數 🌟
         let courseAlertEn = false;
-        let courseAlertVals = [];
+        let alertDisplayDuration = 5000; 
+        
         let courseZeroEn = false;
-        let courseZeroVal = 0;
+        let zeroDisplayDuration = 5000;  
 
-        let syncTimer = 5; // 同步倒數計時器 (5秒)
+        let syncTimer = 5; 
 
         function initHall() {
             const urlParams = new URLSearchParams(window.location.search);
@@ -251,14 +250,13 @@
             document.getElementById('clock-date').textContent = now.toLocaleDateString('zh-TW', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
         }
 
-        // 計算兩個時間的差距(分鐘)
         function calcDuration(start, end) {
             if(!start || !end || start === "--" || end === "--") return "--";
             try {
                 let [h1, m1] = start.split(':').map(Number);
                 let [h2, m2] = end.split(':').map(Number);
                 let diff = (h2 * 60 + m2) - (h1 * 60 + m1);
-                return diff > 0 ? diff : diff + 1440; // 處理跨日問題
+                return diff > 0 ? diff : diff + 1440; 
             } catch(e) { return "--"; }
         }
 
@@ -279,27 +277,33 @@
                 }
 
                 if (data.success) {
-                    // 同步當前課程資料
                     if (data.current) {
                         remainSeconds = Number(data.current.remainingSeconds) || 0;
                         if (isNaN(remainSeconds)) remainSeconds = 0;
 
                         isPreroll = data.current.isPreroll;
-                        courseAlertEn = data.current.alertEn;
                         
-                        // 🌟 核心需求：強制鎖定倒數提醒為 10分(600s), 5分(300s), 3分(180s) 🌟
-                        courseAlertVals = [600, 300, 180]; 
+                        // ==========================================
+                        // 1. 倒數提醒 (F欄 開關 / G欄 閃爍秒數)
+                        // ==========================================
+                        courseAlertEn = data.current.alertEn; // F欄: true/false
+                        let rawAlertVal = (data.current.alertVals && data.current.alertVals.length > 0) ? data.current.alertVals[0] : 0; 
+                        // 如果有填寫閃爍秒數就轉換為毫秒，沒填預設為 5 秒
+                        alertDisplayDuration = (rawAlertVal > 0) ? rawAlertVal * 1000 : 5000;
                         
-                        courseZeroEn = data.current.zeroEn;
-                        courseZeroVal = data.current.zeroVal || 0;
+                        // ==========================================
+                        // 2. 時間到提醒 (H欄 開關 / I欄 閃爍秒數)
+                        // ==========================================
+                        courseZeroEn = data.current.zeroEn; // H欄: true/false
+                        let rawZeroVal = data.current.zeroVal || 0;
+                        // 如果有填寫閃爍秒數就轉換為毫秒，沒填預設為 5 秒
+                        zeroDisplayDuration = (rawZeroVal > 0) ? rawZeroVal * 1000 : 5000;
 
-                        // 若換了新課程，清空觸發記憶
                         if (data.current.name !== currentCourseName) {
                             currentCourseName = data.current.name;
                             triggeredAlerts.clear(); 
                         }
 
-                        // 更新畫面卡片
                         document.getElementById('cur-name').textContent = data.current.name;
                         document.getElementById('cur-speaker').textContent = data.current.speaker || "--";
                         let duration = calcDuration(data.current.start, data.current.end);
@@ -317,7 +321,6 @@
                         document.getElementById('cur-time').textContent = "--:-- - --:-- (--Min)";
                     }
 
-                    // 同步下一場課程資料
                     if (data.next) {
                         document.getElementById('next-name').textContent = data.next.name;
                         document.getElementById('next-speaker').textContent = data.next.speaker || "--";
@@ -330,8 +333,6 @@
                     }
                     
                     updateSyncUI('success', "雲端同步成功", "");
-                    
-                    // 同步後馬上更新一次畫面
                     updateTimerDisplay();
                     checkAlertTrigger();
                 } else {
@@ -351,29 +352,32 @@
             return `${s} 秒`;
         }
 
-        // 🌟 核心修復：無死角的提醒觸發機制 🌟
+        // ==========================================
+        // 🌟 最終版觸發器：固定時間點觸發，閃爍時間看後台 🌟
+        // ==========================================
         function checkAlertTrigger() {
             if (isPreroll || currentCourseName === "") return;
 
-            // 1. 結束時間提醒 (判斷條件改為 <= 確保不會漏接)
-            if (courseZeroEn && remainSeconds <= courseZeroVal) {
-                if (!triggeredAlerts.has('ZERO')) {
+            // 1. 時間到提醒：固定 0 分 0 秒觸發
+            if (courseZeroEn) {
+                if (remainSeconds === 0 && !triggeredAlerts.has('ZERO')) {
                     triggeredAlerts.add('ZERO');
-                    const msg = courseZeroVal === 0 ? "時間到" : formatTimeText(courseZeroVal) + "後結束";
-                    showAlert(msg, courseZeroVal === 0 ? "請結束演講" : "請準備");
+                    // 顯示零秒提示，停留時間為 I 欄設定的秒數
+                    showAlert("時間到", "請結束演講", zeroDisplayDuration);
                 }
             } 
             
-            // 2. 倒數提醒 (10分, 5分, 3分)
+            // 2. 倒數提醒：固定 10分(600), 5分(300), 3分(180) 觸發
             if (courseAlertEn && remainSeconds > 0) {
-                for (let targetSeconds of courseAlertVals) {
-                    if (courseZeroEn && targetSeconds === courseZeroVal) continue;
-                    
-                    // 給予 15 秒的寬容度，確保即使網路延遲也不會漏接提醒
-                    if (remainSeconds <= targetSeconds && remainSeconds > targetSeconds - 15) {
-                        if (!triggeredAlerts.has(targetSeconds)) {
-                            triggeredAlerts.add(targetSeconds);
-                            showAlert(formatTimeText(targetSeconds), "倒數提醒");
+                const fixedTargets = [600, 300, 180]; 
+                
+                for (let targetSeconds of fixedTargets) {
+                    // 只要進入觸發點 (給予 5 秒網路延遲寬容度)
+                    if (remainSeconds <= targetSeconds && remainSeconds > targetSeconds - 5) {
+                        if (!triggeredAlerts.has(`ALERT_${targetSeconds}`)) {
+                            triggeredAlerts.add(`ALERT_${targetSeconds}`);
+                            // 顯示倒數提示，停留時間為 G 欄設定的秒數
+                            showAlert(formatTimeText(targetSeconds), "倒數提醒", alertDisplayDuration);
                         }
                     }
                 }
@@ -405,13 +409,18 @@
             }
         }
 
-        function showAlert(msg, subText = "時間提醒") {
+        function showAlert(msg, subText = "時間提醒", durationMs = 5000) {
             const screen = document.getElementById('alert-screen');
             document.getElementById('alert-msg').textContent = msg;
             document.getElementById('alert-sub').textContent = subText;
             screen.style.display = 'flex';
-            // 將顯示時間延長到 8 秒，確保演講者一定能看到
-            setTimeout(() => { screen.style.display = 'none'; }, 8000);
+            
+            if (alertTimeout) clearTimeout(alertTimeout);
+            
+            // 畫面閃爍停留時間，完全套用試算表 G 欄或 I 欄的秒數
+            alertTimeout = setTimeout(() => { 
+                screen.style.display = 'none'; 
+            }, durationMs);
         }
 
         function updateSyncUI(status, text, debugMsgText) {
@@ -428,27 +437,22 @@
             initHall(); 
             setInterval(tickClock, 1000);
             
-            // 將計時與同步整合進每秒執行的迴圈中
             setInterval(() => {
-                // 主計時器倒數
                 if (remainSeconds > 0) {
                     remainSeconds--;
                 }
                 
-                // 🌟 獨立執行：確保每一秒都會更新畫面與檢查提醒，絕不漏接 🌟
                 updateTimerDisplay();
-                checkAlertTrigger();
+                checkAlertTrigger(); // 每一秒都會檢查是否踩到 10分, 5分, 3分, 0分 的線
 
-                // 同步倒數處理 (每5秒向雲端抓取一次資料)
                 syncTimer--;
                 document.getElementById('sync-countdown').textContent = `(${syncTimer}s)`;
                 if (syncTimer <= 0) {
-                    syncTimer = 5; // 重置秒數
+                    syncTimer = 5; 
                     fetchSync();
                 }
             }, 1000);
 
-            // 第一次載入時立刻同步
             fetchSync();
             document.getElementById('sync-countdown').textContent = `(${syncTimer}s)`;
 
