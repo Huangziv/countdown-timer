@@ -7,11 +7,12 @@
     <style>
         :root {
             --bg-color: #121212;
-            --card-bg: #1e1e1e;
+            --card-bg: #2b2d31; /* 根據截圖調整為深灰底色 */
             --primary: #5865f2;
-            --danger: #ff4d4d;
+            --danger: #ed4245;  /* 根據截圖調整為柔和一點的紅 */
             --success: #00c853;
             --warning: #ffab00;
+            --info-blue: #3498db; /* 根據截圖調整為柔和一點的藍 */
         }
         body {
             margin: 0; padding: 25px; height: 100vh; box-sizing: border-box;
@@ -29,14 +30,14 @@
         .top-right { display: flex; align-items: center; gap: 15px; flex-direction: column; align-items: flex-end; }
         
         .hall-select {
-            background-color: #2b2d31; color: white; border: 1px solid #444;
+            background-color: #1e1f22; color: white; border: 1px solid #444;
             padding: 8px 15px; border-radius: 8px; font-size: 1.1rem; cursor: pointer;
             font-family: inherit; font-weight: bold; outline: none; transition: 0.2s;
         }
         .hall-select:hover { border-color: var(--primary); }
 
         .sync-tag { 
-            background: #252525; padding: 8px 15px; border-radius: 30px; 
+            background: #1e1f22; padding: 8px 15px; border-radius: 30px; 
             font-size: 0.9rem; display: flex; align-items: center; gap: 10px;
             border: 1px solid #333; transition: all 0.3s;
         }
@@ -52,47 +53,57 @@
             text-align: right;
         }
 
-        /* 計時器主區塊：修復垂直超出螢幕的問題 */
+        /* 計時器主區塊：向上推擠並極大化字體 */
         .timer-wrap { 
-            flex-grow: 1; display: flex; justify-content: center; align-items: center; 
-            min-height: 0; /* 讓 flexbox 正確計算剩餘空間 */
+            flex-grow: 1; display: flex; justify-content: center; align-items: flex-start; 
+            padding-top: 4vh; /* 🌟 將整個數字區塊往上推，減少上方空白 🌟 */
+            min-height: 0; 
         }
         #main-timer { 
-            font-size: min(32vw, 60vh); /* 🌟 極大化字體：盡可能撐滿中間的高度與寬度 🌟 */
-            line-height: 0.85; /* 🌟 壓縮字體本身的上下隱藏留白 🌟 */
+            font-size: min(38vw, 68vh); /* 🌟 字體再加大！盡可能撐滿可用空間 🌟 */
+            line-height: 0.82; 
             font-weight: 900; font-variant-numeric: tabular-nums;
             letter-spacing: -0.5vw; text-shadow: 0 0 50px rgba(0,0,0,0.8);
             transition: color 0.3s ease;
         }
 
-        /* 下方課堂資訊卡片：修復被超長文字撐爆的問題 */
+        /* 下方課堂資訊卡片：完美復刻截圖樣式 */
         .footer-grid { 
             display: grid; grid-template-columns: 1fr 1fr; gap: 20px; 
             margin-bottom: 10px; z-index: 2; flex-shrink: 0; 
             width: 100%; 
         }
         .card { 
-            background: var(--card-bg); padding: 20px; border-radius: 15px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5); border-left: 10px solid var(--primary);
-            min-width: 0; /* 🌟 核心防呆：防止超長文字把網格橫向撐破 🌟 */
+            background: var(--card-bg); padding: 15px 20px; border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3); border: 1px solid #3a3c42;
+            min-width: 0; display: flex; flex-direction: column;
         }
-        .card.active { border-left-color: var(--danger); }
-        .label { color: #888; font-size: 1.1rem; text-transform: uppercase; margin-bottom: 8px; display: block; font-weight: bold; }
         
-        .title { 
-            font-size: 1.8rem; font-weight: bold; margin-bottom: 5px; 
-            /* 讓超長標題最多顯示兩行，超過變成刪節號 */
-            display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; 
-            overflow: hidden; line-height: 1.3;
+        .card-header {
+            display: flex; align-items: center; gap: 8px;
+            padding-bottom: 8px; margin-bottom: 12px;
+            font-size: 1.15rem; font-weight: bold;
         }
-        .detail { 
-            font-size: 1.2rem; color: #bbb; 
-            /* 讓超長講師名單保持單行，超過變成刪節號 */
-            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; 
+        .current-header { border-bottom: 1px solid var(--danger); }
+        .next-header { border-bottom: 1px solid var(--info-blue); }
+
+        /* 圖示樣式 */
+        .icon-circle { width: 16px; height: 16px; border-radius: 50%; background: var(--danger); border: 1px solid #111; }
+        .icon-square { 
+            width: 16px; height: 16px; background: var(--info-blue); border: 1px solid #111; border-radius: 2px;
+            display: flex; justify-content: center; align-items: center; color: white; font-size: 10px; 
+        }
+
+        .card-body {
+            display: flex; flex-direction: column; gap: 8px;
+            font-size: 1.15rem; color: #ddd;
+        }
+        .card-body div {
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; /* 🌟 超長自動顯示... 🌟 */
         }
 
         .text-red { color: var(--danger) !important; }
-        .text-blue { color: #4dabf7 !important; }
+        .text-blue { color: var(--info-blue) !important; }
         .blink { animation: flash 1s step-end infinite; }
         @keyframes flash { 50% { opacity: 0.1; } }
         @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
@@ -136,17 +147,30 @@
         <div id="main-timer">--:--</div>
     </div>
 
-    <!-- 恢復顯示課堂資訊的卡片區 -->
+    <!-- 🌟 全新排版的資訊卡片區塊 🌟 -->
     <div class="footer-grid">
-        <div class="card active">
-            <span class="label">🔴 當前階段 (Current)</span>
-            <div id="cur-name" class="title">等待同步...</div>
-            <div id="cur-info" class="detail">--:-- | 講師</div>
-        </div>
         <div class="card">
-            <span class="label">▶️ 下一場預告 (Next)</span>
-            <div id="next-name" class="title">--</div>
-            <div id="next-info" class="detail">--:-- | 講師</div>
+            <div class="card-header current-header">
+                <div class="icon-circle"></div>
+                <span class="text-red">當前課程</span>
+            </div>
+            <div class="card-body">
+                <div>課程：<span id="cur-name">--</span></div>
+                <div>講師：<span id="cur-speaker">--</span></div>
+                <div>時間：<span id="cur-time">--:-- - --:-- (--Min)</span></div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-header next-header">
+                <div class="icon-square">▶</div>
+                <span class="text-blue">下堂課程</span>
+            </div>
+            <div class="card-body">
+                <div>課程：<span id="next-name">--</span></div>
+                <div>講師：<span id="next-speaker">--</span></div>
+                <div>時間：<span id="next-time">--:-- - --:-- (--Min)</span></div>
+            </div>
         </div>
     </div>
 
@@ -189,6 +213,17 @@
             document.getElementById('clock-date').textContent = now.toLocaleDateString('zh-TW', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
         }
 
+        // 計算兩個時間的差距(分鐘)
+        function calcDuration(start, end) {
+            if(!start || !end || start === "--" || end === "--") return "--";
+            try {
+                let [h1, m1] = start.split(':').map(Number);
+                let [h2, m2] = end.split(':').map(Number);
+                let diff = (h2 * 60 + m2) - (h1 * 60 + m1);
+                return diff > 0 ? diff : diff + 1440; // 處理跨日問題
+            } catch(e) { return "--"; }
+        }
+
         async function fetchSync() {
             updateSyncUI('loading', `正在同步資料...`, "");
 
@@ -224,25 +259,30 @@
 
                         // 更新畫面卡片
                         document.getElementById('cur-name').textContent = data.current.name;
-                        document.getElementById('cur-info').textContent = `${data.current.start} - ${data.current.end} | 講師: ${data.current.speaker || "無"}`;
+                        document.getElementById('cur-speaker').textContent = data.current.speaker || "--";
+                        let duration = calcDuration(data.current.start, data.current.end);
+                        document.getElementById('cur-time').textContent = `${data.current.start} - ${data.current.end} (${duration}Min)`;
                     } else {
                         remainSeconds = 0;
                         currentCourseName = "";
                         lastAlertTrigger = -1;
                         isPreroll = false;
 
-                        // 更新畫面卡片為無課程
-                        document.getElementById('cur-name').textContent = "目前無課程";
-                        document.getElementById('cur-info').textContent = "--:--";
+                        document.getElementById('cur-name').textContent = "--";
+                        document.getElementById('cur-speaker').textContent = "--";
+                        document.getElementById('cur-time').textContent = "--:-- - --:-- (--Min)";
                     }
 
                     // 同步下一場課程資料
                     if (data.next) {
                         document.getElementById('next-name').textContent = data.next.name;
-                        document.getElementById('next-info').textContent = `${data.next.start} - ${data.next.end} | 講師: ${data.next.speaker || "無"}`;
+                        document.getElementById('next-speaker').textContent = data.next.speaker || "--";
+                        let duration = calcDuration(data.next.start, data.next.end);
+                        document.getElementById('next-time').textContent = `${data.next.start} - ${data.next.end} (${duration}Min)`;
                     } else {
-                        document.getElementById('next-name').textContent = "今日課程結束";
-                        document.getElementById('next-info').textContent = "--:--";
+                        document.getElementById('next-name').textContent = "--";
+                        document.getElementById('next-speaker').textContent = "--";
+                        document.getElementById('next-time').textContent = "--:-- - --:-- (--Min)";
                     }
                     
                     updateSyncUI('success', "雲端同步成功", "");
