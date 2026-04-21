@@ -7,12 +7,12 @@
     <style>
         :root {
             --bg-color: #121212;
-            --card-bg: #2b2d31; /* 根據截圖調整為深灰底色 */
+            --card-bg: #2b2d31; 
             --primary: #5865f2;
-            --danger: #ed4245;  /* 根據截圖調整為柔和一點的紅 */
+            --danger: #ed4245;  
             --success: #00c853;
             --warning: #ffab00;
-            --info-blue: #3498db; /* 根據截圖調整為柔和一點的藍 */
+            --info-blue: #3498db; 
         }
         body {
             margin: 0; padding: 25px; height: 100vh; box-sizing: border-box;
@@ -54,24 +54,23 @@
             text-align: right;
         }
 
-        /* 計時器主區塊：向上推擠並極大化字體 */
+        /* 🌟 計時器主區塊：置中並限制最大高度，避免壓到下方卡片 🌟 */
         .timer-wrap { 
-            flex-grow: 1; display: flex; justify-content: center; align-items: flex-start; 
-            padding-top: 4vh; /* 🌟 將整個數字區塊往上推，減少上方空白 🌟 */
+            flex-grow: 1; display: flex; justify-content: center; align-items: center; 
             min-height: 0; 
         }
         #main-timer { 
-            font-size: min(38vw, 68vh); /* 🌟 字體再加大！盡可能撐滿可用空間 🌟 */
-            line-height: 0.82; 
+            font-size: min(35vw, 55vh); /* 將高度限制在 55vh，保留足夠空間給卡片 */
+            line-height: 0.9; 
             font-weight: 900; font-variant-numeric: tabular-nums;
             letter-spacing: -0.5vw; text-shadow: 0 0 50px rgba(0,0,0,0.8);
             transition: color 0.3s ease;
         }
 
-        /* 下方課堂資訊卡片：完美復刻截圖樣式 */
+        /* 下方課堂資訊卡片 */
         .footer-grid { 
             display: grid; grid-template-columns: 1fr 1fr; gap: 20px; 
-            margin-bottom: 10px; z-index: 2; flex-shrink: 0; 
+            z-index: 2; flex-shrink: 0; 
             width: 100%; 
         }
         .card { 
@@ -100,7 +99,7 @@
             font-size: 1.15rem; color: #ddd;
         }
         .card-body div {
-            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; /* 🌟 超長自動顯示... 🌟 */
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; 
         }
 
         .text-red { color: var(--danger) !important; }
@@ -118,18 +117,16 @@
         #alert-screen h1 { font-size: 18vw; margin: 0; text-shadow: 0 10px 30px rgba(0,0,0,0.5); }
         @keyframes bg-pulse { from { background: #ff4d4d; } to { background: #cc0000; } }
 
-        /* 右下角版本與後台連結 */
+        /* 🌟 右下角版本與後台連結 (改為跟隨排版，絕對不遮擋卡片) 🌟 */
         .bottom-right-info {
-            position: fixed;
-            right: 20px;
-            bottom: 15px;
-            text-align: right;
-            font-size: 0.9rem;
-            color: #888;
-            z-index: 100;
             display: flex;
+            justify-content: flex-end;
             align-items: center;
             gap: 12px;
+            font-size: 0.9rem;
+            color: #888;
+            margin-top: 10px;
+            flex-shrink: 0;
         }
         .bottom-right-info a {
             color: var(--info-blue);
@@ -178,7 +175,7 @@
         <div id="main-timer">--:--</div>
     </div>
 
-    <!-- 🌟 全新排版的資訊卡片區塊 🌟 -->
+    <!-- 資訊卡片區塊 -->
     <div class="footer-grid">
         <div class="card">
             <div class="card-header current-header">
@@ -205,15 +202,15 @@
         </div>
     </div>
 
-    <div id="alert-screen">
-        <h1 id="alert-msg">05:00</h1>
-        <p id="alert-sub" style="font-size: 3.5rem; font-weight: bold; margin-top: -20px;">時間提醒</p>
-    </div>
-
-    <!-- 右下角資訊 -->
+    <!-- 底部版本資訊區塊 -->
     <div class="bottom-right-info">
         <span>三重視聽 Ver. 2.0</span>
         <a href="https://docs.google.com/spreadsheets/d/1ynJaZK2OXOChlMo0eQ2Y5ZTWD1EV0Xwm3_8oty6Rmd8/edit" target="_blank">⚙️ 後台連結</a>
+    </div>
+
+    <div id="alert-screen">
+        <h1 id="alert-msg">05:00</h1>
+        <p id="alert-sub" style="font-size: 3.5rem; font-weight: bold; margin-top: -20px;">時間提醒</p>
     </div>
 
     <script>
