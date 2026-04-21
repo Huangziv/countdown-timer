@@ -25,7 +25,7 @@
         #clock-hms { font-size: 3rem; font-weight: bold; font-variant-numeric: tabular-nums; line-height: 1; text-shadow: 0 2px 10px rgba(0,0,0,0.5); }
         #clock-date { font-size: 1.2rem; color: #888; margin-top: 5px; }
 
-        .top-right { display: flex; align-items: center; gap: 15px; }
+        .top-right { display: flex; align-items: center; gap: 15px; flex-direction: column; align-items: flex-end; }
         
         .hall-select {
             background-color: #2b2d31; color: white; border: 1px solid #444;
@@ -42,6 +42,14 @@
         .status-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--success); }
         .status-dot.loading { background: var(--warning); animation: pulse 1s infinite; }
         .status-dot.error { background: var(--danger); }
+
+        #debug-msg {
+            color: var(--warning);
+            font-size: 0.9rem;
+            margin-top: 5px;
+            max-width: 300px;
+            text-align: right;
+        }
 
         .timer-wrap { flex-grow: 1; display: flex; justify-content: center; align-items: center; }
         #main-timer { 
@@ -75,16 +83,19 @@
             <div id="clock-date">載入中...</div>
         </div>
         <div class="top-right">
-            <select id="hall-selector" class="hall-select" onchange="changeHall()">
-                <option value="講經堂">📍 講經堂</option>
-                <option value="國議廳">📍 國議廳</option>
-                <option value="感恩堂">📍 感恩堂</option>
-            </select>
+            <div style="display: flex; gap: 15px; align-items: center;">
+                <select id="hall-selector" class="hall-select" onchange="changeHall()">
+                    <option value="講經堂">📍 講經堂</option>
+                    <option value="國議廳">📍 國議廳</option>
+                    <option value="感恩堂">📍 感恩堂</option>
+                </select>
 
-            <div class="sync-tag" id="sync-container">
-                <div id="status-dot" class="status-dot"></div>
-                <span id="status-text">系統啟動中</span>
+                <div class="sync-tag" id="sync-container">
+                    <div id="status-dot" class="status-dot"></div>
+                    <span id="status-text">系統啟動中</span>
+                </div>
             </div>
+            <div id="debug-msg"></div> 
         </div>
     </div>
 
@@ -98,10 +109,7 @@
     </div>
 
     <script>
-        // =========================================================
-        // ⚠️ 部署設定 ⚠️
-        // 請將發布的 Google Apps Script 網頁應用程式 URL 貼在這裡
-        // =========================================================
+        // 已經為您設定好最新的 API 網址
         const API_BASE_URL = "https://script.google.com/macros/s/AKfycbwJUwQeV3ObeBNl0OjTrGj5KYS7Q5M4dXuHjzIeuii6_83EInwJwnncKlz7Ly5ojbMS/exec"; 
 
         let currentHall = "講經堂";
@@ -110,10 +118,10 @@
         let currentCourseName = "";
         let lastAlertTrigger = -1;
 
-        let alertTimes = []; // 改為儲存各個目標秒數
-        let enableZeroAlert = false;
-        let alertAtZeroTime = 0;
-        let alertsEnabled = false;
+        let courseAlertEn = false;
+        let courseAlertVals = [];
+        let courseZeroEn = false;
+        let courseZeroVal = 0;
 
         function initHall() {
             const urlParams = new URLSearchParams(window.location.search);
@@ -135,28 +143,32 @@
         }
 
         async function fetchSync() {
-            if (!API_BASE_URL || API_BASE_URL.includes("在此貼上")) {
-                updateSyncUI('error', "未設定後端 API"); return;
-            }
-
-            updateSyncUI('loading', `正在同步資料...`);
+            updateSyncUI('loading', `正在同步資料...`, "");
 
             try {
                 const fetchUrl = API_BASE_URL + "?hall=" + encodeURIComponent(currentHall);
                 const response = await fetch(fetchUrl, { redirect: 'follow' });
-                const data = await response.json();
+                const rawText = await response.text();
+                let data;
+                
+                try {
+                    data = JSON.parse(rawText);
+                } catch (parseErr) {
+                    updateSyncUI('error', "資料格式異常", "後端回傳的不是有效資料");
+                    return;
+                }
 
                 if (data.success) {
-                    if (data.settings) {
-                        alertsEnabled = data.settings.ENABLE_ALERTS;
-                        alertTimes = data.settings.ALERT_TIMES || [300, 180, 60];
-                        enableZeroAlert = data.settings.ENABLE_ZERO_ALERT;
-                        alertAtZeroTime = data.settings.ALERT_AT_ZERO_TIME !== undefined ? data.settings.ALERT_AT_ZERO_TIME : 0;
-                    }
-
                     if (data.current) {
-                        remainSeconds = data.current.remain;
+                        // 【防呆修復】確保一定能抓到數字，避免出現 NaN
+                        remainSeconds = Number(data.current.remainingSeconds) || 0;
+                        if (isNaN(remainSeconds)) remainSeconds = 0;
+
                         isPreroll = data.current.isPreroll;
+                        courseAlertEn = data.current.alertEn;
+                        courseAlertVals = data.current.alertVals || [];
+                        courseZeroEn = data.current.zeroEn;
+                        courseZeroVal = data.current.zeroVal || 0;
 
                         if (data.current.name !== currentCourseName) {
                             currentCourseName = data.current.name;
@@ -169,18 +181,17 @@
                         isPreroll = false;
                     }
                     
-                    updateSyncUI('success', "雲端同步成功");
+                    updateSyncUI('success', "雲端同步成功", "");
                     updateTimerDisplay();
                 } else {
-                    updateSyncUI('error', data.error || "資料異常");
+                    updateSyncUI('error', "無法讀取排程", data.error || "未知錯誤");
                 }
             } catch (err) {
-                console.error("同步失敗:", err);
-                updateSyncUI('error', "網路連線異常");
+                console.error("Fetch API 同步失敗:", err);
+                updateSyncUI('error', "網路連線異常", "請檢查網路連線");
             }
         }
 
-        // 將秒數轉換為易讀的文字 (如 3分30秒, 45秒)
         function formatTimeText(totalSeconds) {
             const m = Math.floor(totalSeconds / 60);
             const s = totalSeconds % 60;
@@ -190,24 +201,18 @@
         }
 
         function checkAlertTrigger() {
-            if (!alertsEnabled || isPreroll) return;
+            if (isPreroll) return;
 
-            // 檢查結束提醒 (可能為0，或是自訂的提早結束秒數)
-            if (enableZeroAlert && remainSeconds === alertAtZeroTime && lastAlertTrigger !== 'ZERO') {
+            if (courseZeroEn && remainSeconds === courseZeroVal && lastAlertTrigger !== 'ZERO') {
                 if (currentCourseName !== "") {
-                    const msg = alertAtZeroTime === 0 ? "00:00" : formatTimeText(alertAtZeroTime);
-                    const subText = alertAtZeroTime === 0 ? "時間到！請結束演講" : "即將結束！請準備";
-                    showAlert(msg, subText);
+                    const msg = courseZeroVal === 0 ? "時間到" : formatTimeText(courseZeroVal) + "後結束";
+                    showAlert(msg, courseZeroVal === 0 ? "請結束演講" : "請準備");
                     lastAlertTrigger = 'ZERO';
                 }
             } 
-            // 檢查自訂倒數提醒 (分秒)
-            else if (remainSeconds > 0) {
-                for (let targetSeconds of alertTimes) {
-                    // 避免倒數提醒跟結束提醒時間一樣時，跳兩次視窗
-                    if (enableZeroAlert && targetSeconds === alertAtZeroTime) continue;
-
-                    // 給予2秒容錯緩衝
+            else if (courseAlertEn && remainSeconds > 0) {
+                for (let targetSeconds of courseAlertVals) {
+                    if (courseZeroEn && targetSeconds === courseZeroVal) continue;
                     if (remainSeconds <= targetSeconds && remainSeconds >= targetSeconds - 2) {
                         if (lastAlertTrigger !== targetSeconds) {
                             showAlert(formatTimeText(targetSeconds), "倒數提醒");
@@ -219,12 +224,24 @@
         }
 
         function updateTimerDisplay() {
+            // 確保 remainSeconds 絕對不會是 NaN
+            if (isNaN(remainSeconds)) remainSeconds = 0;
+
             const m = Math.floor(remainSeconds / 60);
             const s = remainSeconds % 60;
             const timerEl = document.getElementById('main-timer');
             
+            // 如果沒課程，顯示 00:00
+            if (currentCourseName === "") {
+                timerEl.textContent = "00:00";
+                timerEl.className = "";
+                timerEl.style.color = "#444"; // 休息時變暗
+                return;
+            }
+
             timerEl.textContent = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
             timerEl.className = ""; 
+            timerEl.style.color = ""; // 恢復原本顏色
 
             if (isPreroll) {
                 timerEl.classList.add('text-blue');
@@ -241,9 +258,11 @@
             setTimeout(() => { screen.style.display = 'none'; }, 6000);
         }
 
-        function updateSyncUI(status, text) {
+        function updateSyncUI(status, text, debugMsgText) {
             const dot = document.getElementById('status-dot');
             document.getElementById('status-text').textContent = text;
+            document.getElementById('debug-msg').textContent = debugMsgText || "";
+            
             dot.className = "status-dot"; 
             if (status === 'loading') dot.classList.add('loading');
             if (status === 'error') dot.classList.add('error');
