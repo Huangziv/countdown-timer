@@ -7,7 +7,6 @@
     <style>
         :root {
             --bg-color: #121212;
-            --card-bg: #1e1e1e;
             --primary: #5865f2;
             --danger: #ff4d4d;
             --success: #00c853;
@@ -51,16 +50,6 @@
             transition: color 0.3s ease;
         }
 
-        .footer-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 25px; }
-        .card { 
-            background: var(--card-bg); padding: 25px; border-radius: 20px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5); border-left: 10px solid var(--primary);
-        }
-        .card.active { border-left-color: var(--danger); }
-        .label { color: #888; font-size: 1.1rem; text-transform: uppercase; margin-bottom: 10px; display: block; font-weight: bold; }
-        .title { font-size: 2.2rem; font-weight: bold; margin-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .detail { font-size: 1.4rem; color: #bbb; }
-
         .text-red { color: var(--danger) !important; }
         .text-blue { color: #4dabf7 !important; }
         .blink { animation: flash 1s step-end infinite; }
@@ -101,19 +90,6 @@
 
     <div class="timer-wrap">
         <div id="main-timer">--:--</div>
-    </div>
-
-    <div class="footer-grid">
-        <div class="card active">
-            <span class="label">🔴 當前階段 (Current)</span>
-            <div id="cur-name" class="title">等待同步...</div>
-            <div id="cur-info" class="detail">--:-- | 講師</div>
-        </div>
-        <div class="card">
-            <span class="label">▶️ 下一場預告 (Next)</span>
-            <div id="next-name" class="title">--</div>
-            <div id="next-info" class="detail">--:-- | 講師</div>
-        </div>
     </div>
 
     <div id="alert-screen">
@@ -179,8 +155,6 @@
                     }
 
                     if (data.current) {
-                        document.getElementById('cur-name').textContent = data.current.name;
-                        document.getElementById('cur-info').textContent = `${data.current.start} - ${data.current.end} | 講師: ${data.current.speaker}`;
                         remainSeconds = data.current.remain;
                         isPreroll = data.current.isPreroll;
 
@@ -189,20 +163,10 @@
                             lastAlertTrigger = -1; 
                         }
                     } else {
-                        document.getElementById('cur-name').textContent = "目前無課程";
-                        document.getElementById('cur-info').textContent = "--";
                         remainSeconds = 0;
                         currentCourseName = "";
                         lastAlertTrigger = -1;
                         isPreroll = false;
-                    }
-
-                    if (data.next) {
-                        document.getElementById('next-name').textContent = data.next.name;
-                        document.getElementById('next-info').textContent = `${data.next.start} | 講師: ${data.next.speaker}`;
-                    } else {
-                        document.getElementById('next-name').textContent = "今日課程結束";
-                        document.getElementById('next-info').textContent = "--";
                     }
                     
                     updateSyncUI('success', "雲端同步成功");
