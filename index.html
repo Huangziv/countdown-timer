@@ -46,12 +46,14 @@
         .status-dot.error { background: var(--danger); }
         #sync-countdown { color: #888; font-size: 0.85rem; margin-left: 2px; font-variant-numeric: tabular-nums; width: 25px; text-align: right; }
 
+        /* 顯示目前抓取到的試算表設定，方便除錯 */
         #debug-msg {
             color: var(--warning);
-            font-size: 0.9rem;
+            font-size: 0.95rem;
             margin-top: 5px;
-            max-width: 300px;
+            max-width: 350px;
             text-align: right;
+            font-weight: bold;
         }
 
         /* 計時器主區塊 */
@@ -65,6 +67,7 @@
             font-weight: 900; font-variant-numeric: tabular-nums;
             letter-spacing: -0.5vw; text-shadow: 0 0 50px rgba(0,0,0,0.8);
             transition: color 0.3s ease;
+            cursor: pointer; /* 點擊數字可以測試提醒 */
         }
 
         /* 下方課堂資訊卡片 */
@@ -87,7 +90,6 @@
         .current-header { border-bottom: 1px solid var(--danger); }
         .next-header { border-bottom: 1px solid var(--info-blue); }
 
-        /* 圖示樣式 */
         .icon-circle { width: 16px; height: 16px; border-radius: 50%; background: var(--danger); border: 1px solid #111; }
         .icon-square { 
             width: 16px; height: 16px; background: var(--info-blue); border: 1px solid #111; border-radius: 2px;
@@ -108,6 +110,7 @@
         @keyframes flash { 50% { opacity: 0.1; } }
         @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
 
+        /* 全螢幕紅色閃爍提醒 */
         #alert-screen {
             position: fixed; top:0; left:0; width: 100%; height:100%;
             background: var(--danger); z-index: 9999; display: none;
@@ -167,12 +170,13 @@
                     <span id="sync-countdown"></span>
                 </div>
             </div>
-            <div id="debug-msg"></div> 
+            <!-- 🌟 全新狀態監控面板 🌟 -->
+            <div id="debug-msg">連線取得設定中...</div> 
         </div>
     </div>
 
     <div class="timer-wrap">
-        <div id="main-timer">--:--</div>
+        <div id="main-timer" title="點擊這裡可以測試紅色閃爍提醒">--:--</div>
     </div>
 
     <div class="footer-grid">
@@ -202,7 +206,7 @@
     </div>
 
     <div class="bottom-right-info">
-        <span>三重視聽 Ver. 2.5 (終極提醒版)</span>
+        <span>三重視聽 Ver. 2.6 (獨立設定版)</span>
         <a href="https://docs.google.com/spreadsheets/d/1ynJaZK2OXOChlMo0eQ2Y5ZTWD1EV0Xwm3_8oty6Rmd8/edit" target="_blank">⚙️ 後台連結</a>
     </div>
 
@@ -212,6 +216,7 @@
     </div>
 
     <script>
+        // ⚠️ 確保此網址為最新的 GAS 部署網址 ⚠️
         const API_BASE_URL = "https://script.google.com/macros/s/AKfycbwJUwQeV3ObeBNl0OjTrGj5KYS7Q5M4dXuHjzIeuii6_83EInwJwnncKlz7Ly5ojbMS/exec"; 
 
         let currentHall = "講經堂";
@@ -222,7 +227,7 @@
         let triggeredAlerts = new Set();
         let alertTimeout = null; 
 
-        // 🌟 變數：後台的 Y/N 開關與閃爍顯示秒數 🌟
+        // 🌟 變數：控制開關與閃爍秒數 🌟
         let courseAlertEn = false;
         let alertDisplayDuration = 5000; 
         
@@ -261,7 +266,7 @@
         }
 
         async function fetchSync() {
-            updateSyncUI('loading', `正在同步...`, "");
+            updateSyncUI('loading', `正在同步...`);
 
             try {
                 const fetchUrl = API_BASE_URL + "?hall=" + encodeURIComponent(currentHall);
@@ -272,7 +277,7 @@
                 try {
                     data = JSON.parse(rawText);
                 } catch (parseErr) {
-                    updateSyncUI('error', "資料格式異常", "後端回傳的不是有效資料");
+                    updateSyncUI('error', "資料格式異常");
                     return;
                 }
 
@@ -286,24 +291,31 @@
                         // ==========================================
                         // 1. 倒數提醒 (F欄 開關 / G欄 閃爍秒數)
                         // ==========================================
-                        courseAlertEn = data.current.alertEn; // F欄: true/false
+                        courseAlertEn = !!data.current.alertEn;
                         let rawAlertVal = (data.current.alertVals && data.current.alertVals.length > 0) ? data.current.alertVals[0] : 0; 
-                        // 如果有填寫閃爍秒數就轉換為毫秒，沒填預設為 5 秒
+                        // 如果有填寫閃爍秒數就轉換為毫秒，沒填則預設為 5 秒
                         alertDisplayDuration = (rawAlertVal > 0) ? rawAlertVal * 1000 : 5000;
                         
                         // ==========================================
                         // 2. 時間到提醒 (H欄 開關 / I欄 閃爍秒數)
                         // ==========================================
-                        courseZeroEn = data.current.zeroEn; // H欄: true/false
+                        courseZeroEn = !!data.current.zeroEn;
                         let rawZeroVal = data.current.zeroVal || 0;
-                        // 如果有填寫閃爍秒數就轉換為毫秒，沒填預設為 5 秒
+                        // 如果有填寫閃爍秒數就轉換為毫秒，沒填則預設為 5 秒
                         zeroDisplayDuration = (rawZeroVal > 0) ? rawZeroVal * 1000 : 5000;
 
+                        // 更新畫面右上角的狀態監控面板 (讓您一秒看出後台的設定對不對)
+                        let alertStatus = courseAlertEn ? `開(閃${alertDisplayDuration/1000}s)` : `關`;
+                        let zeroStatus = courseZeroEn ? `開(閃${zeroDisplayDuration/1000}s)` : `關`;
+                        document.getElementById('debug-msg').textContent = `倒數10/5/3: ${alertStatus} | 0分提醒: ${zeroStatus}`;
+
+                        // 若換了新課程，清空觸發記憶
                         if (data.current.name !== currentCourseName) {
                             currentCourseName = data.current.name;
                             triggeredAlerts.clear(); 
                         }
 
+                        // 更新畫面卡片
                         document.getElementById('cur-name').textContent = data.current.name;
                         document.getElementById('cur-speaker').textContent = data.current.speaker || "--";
                         let duration = calcDuration(data.current.start, data.current.end);
@@ -319,6 +331,7 @@
                         document.getElementById('cur-name').textContent = "--";
                         document.getElementById('cur-speaker').textContent = "--";
                         document.getElementById('cur-time').textContent = "--:-- - --:-- (--Min)";
+                        document.getElementById('debug-msg').textContent = "目前無課程，不觸發提醒";
                     }
 
                     if (data.next) {
@@ -332,15 +345,15 @@
                         document.getElementById('next-time').textContent = "--:-- - --:-- (--Min)";
                     }
                     
-                    updateSyncUI('success', "雲端同步成功", "");
+                    updateSyncUI('success', "雲端同步成功");
                     updateTimerDisplay();
                     checkAlertTrigger();
                 } else {
-                    updateSyncUI('error', "無法讀取排程", data.error || "未知錯誤");
+                    updateSyncUI('error', "無法讀取排程");
                 }
             } catch (err) {
                 console.error("Fetch API 同步失敗:", err);
-                updateSyncUI('error', "網路連線異常", "請檢查網路連線");
+                updateSyncUI('error', "網路連線異常");
             }
         }
 
@@ -353,7 +366,7 @@
         }
 
         // ==========================================
-        // 🌟 最終版觸發器：固定時間點觸發，閃爍時間看後台 🌟
+        // 🌟 核心觸發器：固定時間點觸發，閃爍時間看後台 🌟
         // ==========================================
         function checkAlertTrigger() {
             if (isPreroll || currentCourseName === "") return;
@@ -362,7 +375,6 @@
             if (courseZeroEn) {
                 if (remainSeconds === 0 && !triggeredAlerts.has('ZERO')) {
                     triggeredAlerts.add('ZERO');
-                    // 顯示零秒提示，停留時間為 I 欄設定的秒數
                     showAlert("時間到", "請結束演講", zeroDisplayDuration);
                 }
             } 
@@ -372,11 +384,10 @@
                 const fixedTargets = [600, 300, 180]; 
                 
                 for (let targetSeconds of fixedTargets) {
-                    // 只要進入觸發點 (給予 5 秒網路延遲寬容度)
+                    // 給予 5 秒網路延遲寬容度。例如：如果剩餘時間是 598 秒(不到 10 分)，一樣會觸發 10 分鐘提醒
                     if (remainSeconds <= targetSeconds && remainSeconds > targetSeconds - 5) {
                         if (!triggeredAlerts.has(`ALERT_${targetSeconds}`)) {
                             triggeredAlerts.add(`ALERT_${targetSeconds}`);
-                            // 顯示倒數提示，停留時間為 G 欄設定的秒數
                             showAlert(formatTimeText(targetSeconds), "倒數提醒", alertDisplayDuration);
                         }
                     }
@@ -423,10 +434,9 @@
             }, durationMs);
         }
 
-        function updateSyncUI(status, text, debugMsgText) {
+        function updateSyncUI(status, text) {
             const dot = document.getElementById('status-dot');
             document.getElementById('status-text').textContent = text;
-            document.getElementById('debug-msg').textContent = debugMsgText || "";
             
             dot.className = "status-dot"; 
             if (status === 'loading') dot.classList.add('loading');
@@ -443,7 +453,7 @@
                 }
                 
                 updateTimerDisplay();
-                checkAlertTrigger(); // 每一秒都會檢查是否踩到 10分, 5分, 3分, 0分 的線
+                checkAlertTrigger(); 
 
                 syncTimer--;
                 document.getElementById('sync-countdown').textContent = `(${syncTimer}s)`;
@@ -456,10 +466,16 @@
             fetchSync();
             document.getElementById('sync-countdown').textContent = `(${syncTimer}s)`;
 
+            // 雙擊全螢幕設定
             document.body.ondblclick = (e) => {
                 if (e.target.tagName.toLowerCase() === 'select' || e.target.tagName.toLowerCase() === 'option') return;
                 if (!document.fullscreenElement) document.documentElement.requestFullscreen();
                 else document.exitFullscreen();
+            };
+
+            // 點擊中間數字可以直接測試「紅色閃爍提醒」是否正常運作
+            document.getElementById('main-timer').onclick = () => {
+                showAlert("測試提醒", "畫面功能正常", 3000);
             };
         };
     </script>
