@@ -204,7 +204,7 @@
 
     <!-- 底部版本資訊區塊 -->
     <div class="bottom-right-info">
-        <span>三重視聽 Ver. 2.0</span>
+        <span>三重視聽 Ver. 2.1</span>
         <a href="https://docs.google.com/spreadsheets/d/1ynJaZK2OXOChlMo0eQ2Y5ZTWD1EV0Xwm3_8oty6Rmd8/edit" target="_blank">⚙️ 後台連結</a>
     </div>
 
@@ -221,7 +221,9 @@
         let remainSeconds = 0;
         let isPreroll = false;
         let currentCourseName = "";
-        let lastAlertTrigger = -1;
+        
+        // 🌟 核心修復：使用 Set 來記憶已經觸發過的提醒，確保萬無一失 🌟
+        let triggeredAlerts = new Set();
 
         let courseAlertEn = false;
         let courseAlertVals = [];
@@ -284,13 +286,17 @@
 
                         isPreroll = data.current.isPreroll;
                         courseAlertEn = data.current.alertEn;
-                        courseAlertVals = data.current.alertVals || [];
+                        
+                        // 🌟 核心需求：強制鎖定倒數提醒為 10分(600s), 5分(300s), 3分(180s) 🌟
+                        courseAlertVals = [600, 300, 180]; 
+                        
                         courseZeroEn = data.current.zeroEn;
                         courseZeroVal = data.current.zeroVal || 0;
 
+                        // 若換了新課程，清空觸發記憶
                         if (data.current.name !== currentCourseName) {
                             currentCourseName = data.current.name;
-                            lastAlertTrigger = -1; 
+                            triggeredAlerts.clear(); 
                         }
 
                         // 更新畫面卡片
@@ -300,8 +306,10 @@
                         document.getElementById('cur-time').textContent = `${data.current.start} - ${data.current.end} (${duration}Min)`;
                     } else {
                         remainSeconds = 0;
-                        currentCourseName = "";
-                        lastAlertTrigger = -1;
+                        if (currentCourseName !== "") {
+                            currentCourseName = "";
+                            triggeredAlerts.clear();
+                        }
                         isPreroll = false;
 
                         document.getElementById('cur-name').textContent = "--";
@@ -322,7 +330,10 @@
                     }
                     
                     updateSyncUI('success', "雲端同步成功", "");
+                    
+                    // 同步後馬上更新一次畫面
                     updateTimerDisplay();
+                    checkAlertTrigger();
                 } else {
                     updateSyncUI('error', "無法讀取排程", data.error || "未知錯誤");
                 }
@@ -340,23 +351,29 @@
             return `${s} 秒`;
         }
 
+        // 🌟 核心修復：無死角的提醒觸發機制 🌟
         function checkAlertTrigger() {
-            if (isPreroll) return;
+            if (isPreroll || currentCourseName === "") return;
 
-            if (courseZeroEn && remainSeconds === courseZeroVal && lastAlertTrigger !== 'ZERO') {
-                if (currentCourseName !== "") {
+            // 1. 結束時間提醒 (判斷條件改為 <= 確保不會漏接)
+            if (courseZeroEn && remainSeconds <= courseZeroVal) {
+                if (!triggeredAlerts.has('ZERO')) {
+                    triggeredAlerts.add('ZERO');
                     const msg = courseZeroVal === 0 ? "時間到" : formatTimeText(courseZeroVal) + "後結束";
                     showAlert(msg, courseZeroVal === 0 ? "請結束演講" : "請準備");
-                    lastAlertTrigger = 'ZERO';
                 }
             } 
-            else if (courseAlertEn && remainSeconds > 0) {
+            
+            // 2. 倒數提醒 (10分, 5分, 3分)
+            if (courseAlertEn && remainSeconds > 0) {
                 for (let targetSeconds of courseAlertVals) {
                     if (courseZeroEn && targetSeconds === courseZeroVal) continue;
-                    if (remainSeconds <= targetSeconds && remainSeconds >= targetSeconds - 2) {
-                        if (lastAlertTrigger !== targetSeconds) {
+                    
+                    // 給予 15 秒的寬容度，確保即使網路延遲也不會漏接提醒
+                    if (remainSeconds <= targetSeconds && remainSeconds > targetSeconds - 15) {
+                        if (!triggeredAlerts.has(targetSeconds)) {
+                            triggeredAlerts.add(targetSeconds);
                             showAlert(formatTimeText(targetSeconds), "倒數提醒");
-                            lastAlertTrigger = targetSeconds;
                         }
                     }
                 }
@@ -393,7 +410,8 @@
             document.getElementById('alert-msg').textContent = msg;
             document.getElementById('alert-sub').textContent = subText;
             screen.style.display = 'flex';
-            setTimeout(() => { screen.style.display = 'none'; }, 6000);
+            // 將顯示時間延長到 8 秒，確保演講者一定能看到
+            setTimeout(() => { screen.style.display = 'none'; }, 8000);
         }
 
         function updateSyncUI(status, text, debugMsgText) {
@@ -415,11 +433,11 @@
                 // 主計時器倒數
                 if (remainSeconds > 0) {
                     remainSeconds--;
-                    updateTimerDisplay();
-                    checkAlertTrigger();
-                } else if (remainSeconds === 0) {
-                    checkAlertTrigger(); 
                 }
+                
+                // 🌟 獨立執行：確保每一秒都會更新畫面與檢查提醒，絕不漏接 🌟
+                updateTimerDisplay();
+                checkAlertTrigger();
 
                 // 同步倒數處理 (每5秒向雲端抓取一次資料)
                 syncTimer--;
