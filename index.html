@@ -1,283 +1,312 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh-TW">
 <head>
-    <base target="_top">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>三重視聽倒數計時系統</title>
+    <title>三重視聽計時系統</title>
     <style>
+        :root {
+            --bg-color: #121212;
+            --card-bg: #1e1e1e;
+            --primary: #5865f2;
+            --danger: #ff4d4d;
+            --success: #00c853;
+            --warning: #ffab00;
+        }
         body {
-            display: flex; flex-direction: column; height: 100vh; margin: 0;
-            background-color: #383d42; color: white;
-            font-family: '微軟正黑體', 'Arial', sans-serif;
-            padding: 20px; overflow: hidden; position: relative; box-sizing: border-box;
+            margin: 0; padding: 25px; height: 100vh; box-sizing: border-box;
+            background-color: var(--bg-color); color: #e0e0e0;
+            font-family: 'Segoe UI', '微軟正黑體', sans-serif;
+            display: flex; flex-direction: column; overflow: hidden;
         }
 
-        /* 頂部資訊列 */
-        .top-bar { display: flex; justify-content: space-between; align-items: flex-start; width: 100%; margin-bottom: 5px; z-index: 100005; position: relative; }
-        .time-group { display: flex; flex-direction: column; }
-        #top-date { font-size: 1.1em; color: #bbb; }
-        #top-time { font-size: 1.8em; color: white; font-weight: bold; }
-        .top-right-controls { display: flex; gap: 10px; margin-top: 5px; }
-        .top-right-controls button { border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-size: 1.1em; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.3); color: white; }
-        #alert-toggle-btn { background-color: #1abc9c; }
-        #refresh-btn { background-color: #5480B2; }
-        #fullscreen-btn { background-color: #34AA59; }
+        .header { display: flex; justify-content: space-between; align-items: flex-start; }
+        .clock-box { display: flex; flex-direction: column; }
+        .hall-title { color: var(--primary); font-size: 1.5rem; font-weight: bold; margin-bottom: 5px; }
+        #clock-hms { font-size: 3rem; font-weight: bold; font-variant-numeric: tabular-nums; line-height: 1; text-shadow: 0 2px 10px rgba(0,0,0,0.5); }
+        #clock-date { font-size: 1.2rem; color: #888; margin-top: 5px; }
 
-        /* 主要計時區 */
-        .main-display { flex-grow: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 1; margin-top: -30px; }
-        #timer-main { font-size: 28vw; font-weight: 900; line-height: 0.9; }
+        .top-right { display: flex; align-items: center; gap: 15px; }
+        
+        .hall-select {
+            background-color: #2b2d31; color: white; border: 1px solid #444;
+            padding: 8px 15px; border-radius: 8px; font-size: 1.1rem; cursor: pointer;
+            font-family: inherit; font-weight: bold; outline: none; transition: 0.2s;
+        }
+        .hall-select:hover { border-color: var(--primary); }
 
-        /* 課程卡片 */
-        .course-cards-container { display: flex; justify-content: center; gap: 15px; margin-bottom: 65px; z-index: 2; }
-        .course-card { background-color: #464a4f; padding: 12px 20px; border-radius: 10px; width: 45%; font-size: 1.25em; line-height: 1.4; }
-        .card-title { border-bottom: 2px solid; margin-bottom: 8px; font-weight: bold; font-size: 1.1em; padding-bottom: 4px; }
+        .sync-tag { 
+            background: #252525; padding: 8px 15px; border-radius: 30px; 
+            font-size: 0.9rem; display: flex; align-items: center; gap: 10px;
+            border: 1px solid #333; transition: all 0.3s;
+        }
+        .status-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--success); }
+        .status-dot.loading { background: var(--warning); animation: pulse 1s infinite; }
+        .status-dot.error { background: var(--danger); }
 
-        /* 提醒視窗 */
-        #time-alert-box { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: #e74c3c; color: white; display: none; flex-direction: column; justify-content: center; align-items: center; z-index: 999999; }
-        #close-alert-btn { position: absolute; top: 40px; right: 40px; background-color: rgba(255,255,255,0.2); border: 2px solid white; color: white; padding: 15px 30px; border-radius: 10px; font-size: 2em; cursor: pointer; font-weight: bold; }
+        .timer-wrap { flex-grow: 1; display: flex; justify-content: center; align-items: center; }
+        #main-timer { 
+            font-size: 33vw; font-weight: 900; font-variant-numeric: tabular-nums;
+            letter-spacing: -1vw; text-shadow: 0 0 50px rgba(0,0,0,0.8);
+            transition: color 0.3s ease;
+        }
 
-        /* 動效 */
-        .mode-preroll { color: #3498db !important; }
-        .timer-flash-red { color: #e74c3c !important; animation: blink 0.5s infinite alternate; }
-        @keyframes blink { from { opacity: 1; } to { opacity: 0.5; } }
-        .flash-yellow { color: #f1c40f !important; }
-        .flash-white { color: #ffffff !important; }
+        .footer-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 25px; }
+        .card { 
+            background: var(--card-bg); padding: 25px; border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5); border-left: 10px solid var(--primary);
+        }
+        .card.active { border-left-color: var(--danger); }
+        .label { color: #888; font-size: 1.1rem; text-transform: uppercase; margin-bottom: 10px; display: block; font-weight: bold; }
+        .title { font-size: 2.2rem; font-weight: bold; margin-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .detail { font-size: 1.4rem; color: #bbb; }
 
-        .version-tag { position: fixed; left: 20px; bottom: 15px; font-size: 0.85em; color: #888; z-index: 100005; }
-        .bottom-right-link { position: fixed; right: 20px; bottom: 15px; z-index: 100005; }
-        .bottom-right-link a { color: #3498db; text-decoration: none; padding: 8px 12px; background-color: #282a2d; border-radius: 5px; font-weight: bold; font-size: 0.9em; }
+        .text-red { color: var(--danger) !important; }
+        .text-blue { color: #4dabf7 !important; }
+        .blink { animation: flash 1s step-end infinite; }
+        @keyframes flash { 50% { opacity: 0.1; } }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
 
-        #password-modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.9); display: none; justify-content: center; align-items: center; z-index: 100010; }
-        #password-modal-box { background-color: #464a4f; padding: 30px; border-radius: 10px; text-align: center; }
-        #password-input { padding: 10px; margin: 15px 0; width: 220px; border-radius: 5px; border: none; font-size: 1.2em; }
+        #alert-screen {
+            position: fixed; top:0; left:0; width: 100%; height:100%;
+            background: var(--danger); z-index: 9999; display: none;
+            flex-direction: column; justify-content: center; align-items: center; color: white;
+            animation: bg-pulse 1s infinite alternate;
+        }
+        #alert-screen h1 { font-size: 18vw; margin: 0; text-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        @keyframes bg-pulse { from { background: #ff4d4d; } to { background: #cc0000; } }
     </style>
 </head>
 <body>
 
-    <div class="top-bar">
-        <div class="time-group">
-            <div id="top-date">日期載入中...</div>
-            <div id="top-time">--:--:--</div>
+    <div class="header">
+        <div class="clock-box">
+            <div class="hall-title" id="display-hall-name">📍 講經堂</div>
+            <div id="clock-hms">00:00:00</div>
+            <div id="clock-date">載入中...</div>
         </div>
-        <div class="top-right-controls">
-            <button id="alert-toggle-btn" onclick="toggleAlerts()">自動提醒</button>
-            <button id="refresh-btn" onclick="loadSchedule()">重新整理</button>
-            <button id="fullscreen-btn" onclick="toggleFullScreen()">全螢幕</button>
-        </div>
-    </div>
+        <div class="top-right">
+            <select id="hall-selector" class="hall-select" onchange="changeHall()">
+                <option value="講經堂">📍 講經堂</option>
+                <option value="國議廳">📍 國議廳</option>
+                <option value="感恩堂">📍 感恩堂</option>
+            </select>
 
-    <div class="main-display">
-        <div id="timer-main">00:00</div>
-    </div>
-
-    <div class="course-cards-container">
-        <div class="course-card">
-            <div class="card-title" style="color: #e74c3c; border-color: #e74c3c;">🔴 當前課程</div>
-            <div>課程：<span id="curr-name">--</span></div>
-            <div>講師：<span id="curr-speaker">--</span></div>
-            <div>時間：<span id="curr-time">--:-- - --:-- (--Min)</span></div>
-        </div>
-        <div class="course-card">
-            <div class="card-title" style="color: #3498db; border-color: #3498db;">▶️ 下堂課程</div>
-            <div>課程：<span id="next-name">--</span></div>
-            <div>講師：<span id="next-speaker">--</span></div>
-            <div>時間：<span id="next-time">--:-- - --:-- (--Min)</span></div>
+            <div class="sync-tag" id="sync-container">
+                <div id="status-dot" class="status-dot"></div>
+                <span id="status-text">系統啟動中</span>
+            </div>
         </div>
     </div>
 
-    <div class="version-tag" id="footer-info">載入中...</div>
-    <div class="bottom-right-link"><a href="#" onclick="showPasswordModal(); return false;">⚙️ Sheet後台</a></div>
-
-    <div id="time-alert-box">
-        <button id="close-alert-btn" onclick="closeAlert()">關閉提醒 ✕</button>
-        <div style="font-size: 10vw; font-weight: bold; margin-bottom: 20px;">提醒您</div>
-        <div id="alert-content" style="font-size: 22vw; font-weight: 900;">時間到</div>
+    <div class="timer-wrap">
+        <div id="main-timer">--:--</div>
     </div>
 
-    <div id="password-modal-overlay">
-        <div id="password-modal-box">
-            <h3>管理員驗證</h3>
-            <input type="password" id="password-input" placeholder="請輸入密碼">
-            <br>
-            <button style="padding: 10px 20px; background: #34AA59; color: white; border: none; border-radius: 5px; cursor: pointer;" onclick="checkPassword()">確認</button>
-            <button style="padding: 10px 20px; background: #e74c3c; color: white; border: none; border-radius: 5px; cursor: pointer;" onclick="hidePasswordModal()">取消</button>
+    <div class="footer-grid">
+        <div class="card active">
+            <span class="label">🔴 當前階段 (Current)</span>
+            <div id="cur-name" class="title">等待同步...</div>
+            <div id="cur-info" class="detail">--:-- | 講師</div>
         </div>
+        <div class="card">
+            <span class="label">▶️ 下一場預告 (Next)</span>
+            <div id="next-name" class="title">--</div>
+            <div id="next-info" class="detail">--:-- | 講師</div>
+        </div>
+    </div>
+
+    <div id="alert-screen">
+        <h1 id="alert-msg">05:00</h1>
+        <p id="alert-sub" style="font-size: 3.5rem; font-weight: bold; margin-top: -20px;">時間提醒</p>
     </div>
 
     <script>
-        // ★ 核心設定：請替換為您在新試算表部署後獲得的「最新」Web App 網址 ★
-        const API_URL = "https://script.google.com/macros/s/AKfycbz7PtbghRamEPlybfPOGK91ETLKZTE5vLE9gTLu5X1L70NvhStL-kSoRgIU16sjx6UUMg/exec";
-        const SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/1ZGIrD_q14YMOcpyCRBwI3bbE58ekyWuz1pUooD9M7pY/edit?gid=0#gid=0";
-        const PASSWORD = "94800552";
+        // =========================================================
+        // ⚠️ 部署設定 ⚠️
+        // 請將發布的 Google Apps Script 網頁應用程式 URL 貼在這裡
+        // =========================================================
+        const API_BASE_URL = "請在此貼上您的_GAS_網頁應用程式_URL"; 
 
-        let remainingSeconds = 0;
-        let isPreroll = false; 
-        let countdownInterval, alertTimeout, alertFlashInterval;
-        let lastTriggeredValue = null;
-        let alertsEnabled = true;
-        let updateStatus = "成功";
+        let currentHall = "講經堂";
+        let remainSeconds = 0;
+        let isPreroll = false;
+        let currentCourseName = "";
+        let lastAlertTrigger = -1;
 
-        function t2m(start, end) {
-            if (!start || !end || start === "--") return 0;
-            const [h1, m1] = start.split(':').map(Number);
-            const [h2, m2] = end.split(':').map(Number);
-            return (h2 * 60 + m2) - (h1 * 60 + m1);
-        }
+        let alertTimes = []; // 改為儲存各個目標秒數
+        let enableZeroAlert = false;
+        let alertAtZeroTime = 0;
+        let alertsEnabled = false;
 
-        function loadSchedule() {
-            updateStatus = "讀取中...";
-            updateFooterStatus();
+        function initHall() {
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.has('hall')) currentHall = urlParams.get('hall');
             
-            // 使用 fetch API 呼叫後端
-            fetch(`${API_URL}?t=${new Date().getTime()}`)
-            .then(response => {
-                if (!response.ok) throw new Error('網路回應不正常');
-                return response.json();
-            })
-            .then(data => {
-                if (data.error) throw new Error(data.error);
-                updateStatus = "成功";
-                handleData(data);
-                updateFooterStatus();
-            })
-            .catch(err => {
-                console.error("Fetch Error:", err);
-                updateStatus = "連線失敗";
-                updateFooterStatus();
-                // 顯示失敗狀態在計時器上
-                document.getElementById('timer-main').textContent = "FAIL";
-                document.getElementById('timer-main').style.color = "#e74c3c";
-            });
+            document.getElementById('hall-selector').value = currentHall;
+            document.getElementById('display-hall-name').textContent = "📍 " + currentHall;
         }
 
-        function handleData(data) {
-            clearInterval(countdownInterval);
+        function changeHall() {
+            const selected = document.getElementById('hall-selector').value;
+            window.location.href = window.location.pathname + "?hall=" + encodeURIComponent(selected);
+        }
 
-            if (data && data.current) {
-                document.getElementById('curr-name').textContent = data.current.name || "--";
-                document.getElementById('curr-speaker').textContent = data.current.speaker || "--";
-                const duration = t2m(data.current.start, data.current.end);
-                document.getElementById('curr-time').textContent = `${data.current.start} - ${data.current.end} (${duration}Min)`;
-                
-                remainingSeconds = data.current.remainingSeconds;
-                isPreroll = data.current.isPreroll || false;
-                
-                updateTimerDisplay();
-                countdownInterval = setInterval(() => {
-                    if (remainingSeconds > 0) { 
-                        remainingSeconds--; 
-                        updateTimerDisplay(); 
-                    } else { 
-                        loadSchedule(); 
+        function tickClock() {
+            const now = new Date();
+            document.getElementById('clock-hms').textContent = now.toLocaleTimeString('zh-TW', { hour12: false });
+            document.getElementById('clock-date').textContent = now.toLocaleDateString('zh-TW', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+        }
+
+        async function fetchSync() {
+            if (!API_BASE_URL || API_BASE_URL.includes("在此貼上")) {
+                updateSyncUI('error', "未設定後端 API"); return;
+            }
+
+            updateSyncUI('loading', `正在同步資料...`);
+
+            try {
+                const fetchUrl = API_BASE_URL + "?hall=" + encodeURIComponent(currentHall);
+                const response = await fetch(fetchUrl, { redirect: 'follow' });
+                const data = await response.json();
+
+                if (data.success) {
+                    if (data.settings) {
+                        alertsEnabled = data.settings.ENABLE_ALERTS;
+                        alertTimes = data.settings.ALERT_TIMES || [300, 180, 60];
+                        enableZeroAlert = data.settings.ENABLE_ZERO_ALERT;
+                        alertAtZeroTime = data.settings.ALERT_AT_ZERO_TIME !== undefined ? data.settings.ALERT_AT_ZERO_TIME : 0;
                     }
-                }, 1000);
-            } else {
-                document.getElementById('curr-name').textContent = "課間休息 / 尚未開始";
-                document.getElementById('curr-speaker').textContent = "--";
-                document.getElementById('curr-time').textContent = "--:-- - --:--";
-                document.getElementById('timer-main').textContent = "00:00";
-                remainingSeconds = 0;
-                isPreroll = false;
-            }
 
-            if (data && data.next) {
-                document.getElementById('next-name').textContent = data.next.name || "--";
-                document.getElementById('next-speaker').textContent = data.next.speaker || "--";
-                const nextDuration = t2m(data.next.start, data.next.end);
-                document.getElementById('next-time').textContent = `${data.next.start} - ${data.next.end} (${nextDuration}Min)`;
-            } else {
-                document.getElementById('next-name').textContent = "今日課程結束";
-                document.getElementById('next-speaker').textContent = "--";
-                document.getElementById('next-time').textContent = "--:-- - --:--";
+                    if (data.current) {
+                        document.getElementById('cur-name').textContent = data.current.name;
+                        document.getElementById('cur-info').textContent = `${data.current.start} - ${data.current.end} | 講師: ${data.current.speaker}`;
+                        remainSeconds = data.current.remain;
+                        isPreroll = data.current.isPreroll;
+
+                        if (data.current.name !== currentCourseName) {
+                            currentCourseName = data.current.name;
+                            lastAlertTrigger = -1; 
+                        }
+                    } else {
+                        document.getElementById('cur-name').textContent = "目前無課程";
+                        document.getElementById('cur-info').textContent = "--";
+                        remainSeconds = 0;
+                        currentCourseName = "";
+                        lastAlertTrigger = -1;
+                        isPreroll = false;
+                    }
+
+                    if (data.next) {
+                        document.getElementById('next-name').textContent = data.next.name;
+                        document.getElementById('next-info').textContent = `${data.next.start} | 講師: ${data.next.speaker}`;
+                    } else {
+                        document.getElementById('next-name').textContent = "今日課程結束";
+                        document.getElementById('next-info').textContent = "--";
+                    }
+                    
+                    updateSyncUI('success', "雲端同步成功");
+                    updateTimerDisplay();
+                } else {
+                    updateSyncUI('error', data.error || "資料異常");
+                }
+            } catch (err) {
+                console.error("同步失敗:", err);
+                updateSyncUI('error', "網路連線異常");
             }
         }
 
-        function updateTimerDisplay() {
-            const m = Math.floor(remainingSeconds / 60);
-            const s = remainingSeconds % 60;
-            const timerEl = document.getElementById('timer-main');
-            timerEl.textContent = m.toString().padStart(2, '0') + ":" + s.toString().padStart(2, '0');
-            
-            if (isPreroll) { 
-                timerEl.className = 'mode-preroll'; 
-            } else if (remainingSeconds < 60 && remainingSeconds > 0) { 
-                timerEl.className = 'timer-flash-red'; 
-            } else { 
-                timerEl.className = ''; 
-                timerEl.style.color = "white"; 
-            }
-            
-            if (!isPreroll) {
-                const pts = { 900:15, 300:5, 180:3, 60:1 };
-                if (pts[remainingSeconds]) triggerTimeAlert('minutes', pts[remainingSeconds]);
-                if (remainingSeconds === 0 && countdownInterval) {
-                    triggerTimeAlert('end', '');
+        // 將秒數轉換為易讀的文字 (如 3分30秒, 45秒)
+        function formatTimeText(totalSeconds) {
+            const m = Math.floor(totalSeconds / 60);
+            const s = totalSeconds % 60;
+            if (m > 0 && s > 0) return `${m}分${s}秒`;
+            if (m > 0) return `${m} 分鐘`;
+            return `${s} 秒`;
+        }
+
+        function checkAlertTrigger() {
+            if (!alertsEnabled || isPreroll) return;
+
+            // 檢查結束提醒 (可能為0，或是自訂的提早結束秒數)
+            if (enableZeroAlert && remainSeconds === alertAtZeroTime && lastAlertTrigger !== 'ZERO') {
+                if (currentCourseName !== "") {
+                    const msg = alertAtZeroTime === 0 ? "00:00" : formatTimeText(alertAtZeroTime);
+                    const subText = alertAtZeroTime === 0 ? "時間到！請結束演講" : "即將結束！請準備";
+                    showAlert(msg, subText);
+                    lastAlertTrigger = 'ZERO';
+                }
+            } 
+            // 檢查自訂倒數提醒 (分秒)
+            else if (remainSeconds > 0) {
+                for (let targetSeconds of alertTimes) {
+                    // 避免倒數提醒跟結束提醒時間一樣時，跳兩次視窗
+                    if (enableZeroAlert && targetSeconds === alertAtZeroTime) continue;
+
+                    // 給予2秒容錯緩衝
+                    if (remainSeconds <= targetSeconds && remainSeconds >= targetSeconds - 2) {
+                        if (lastAlertTrigger !== targetSeconds) {
+                            showAlert(formatTimeText(targetSeconds), "倒數提醒");
+                            lastAlertTrigger = targetSeconds;
+                        }
+                    }
                 }
             }
         }
 
-        function triggerTimeAlert(type, value) {
-            if (!alertsEnabled && type === 'minutes') return;
-            if (type === 'minutes' && lastTriggeredValue === value) return;
-            lastTriggeredValue = value;
-            const box = document.getElementById('time-alert-box');
-            const display = document.getElementById('alert-content');
-            display.textContent = type === 'end' ? "時間到" : value + " 分鐘";
-            box.style.display = 'flex';
-            clearInterval(alertFlashInterval);
-            let isYellow = true;
-            alertFlashInterval = setInterval(() => { display.className = isYellow ? 'flash-yellow' : 'flash-white'; isYellow = !isYellow; }, 500);
-            clearTimeout(alertTimeout);
-            alertTimeout = setTimeout(closeAlert, type === 'end' ? 90000 : 10000);
-        }
+        function updateTimerDisplay() {
+            const m = Math.floor(remainSeconds / 60);
+            const s = remainSeconds % 60;
+            const timerEl = document.getElementById('main-timer');
+            
+            timerEl.textContent = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+            timerEl.className = ""; 
 
-        function closeAlert() { document.getElementById('time-alert-box').style.display = 'none'; clearInterval(alertFlashInterval); }
-        
-        function updateClock() {
-            const now = new Date();
-            document.getElementById('top-date').textContent = now.toLocaleDateString('zh-TW', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
-            document.getElementById('top-time').textContent = now.toLocaleTimeString('zh-TW', { hour12: false });
-        }
-        
-        function updateFooterStatus() {
-            const isFS = !!(document.fullscreenElement || document.webkitFullscreenElement);
-            document.getElementById('footer-info').innerHTML = `三重視聽 Ver. 2026.02.27 | 自動提醒：${alertsEnabled ? '開啟' : '關閉'} | 數據更新：${updateStatus} | 全螢幕：${isFS ? '開啟' : '關閉'}`;
-            document.getElementById('alert-toggle-btn').style.backgroundColor = alertsEnabled ? "#1abc9c" : "#7f8c8d";
-        }
-        
-        function toggleAlerts() { alertsEnabled = !alertsEnabled; if(!alertsEnabled) closeAlert(); updateFooterStatus(); }
-        
-        function toggleFullScreen() {
-            const elem = document.documentElement;
-            if (!document.fullscreenElement) { 
-                if (elem.requestFullscreen) elem.requestFullscreen(); 
-                else if (elem.webkitRequestFullscreen) elem.webkitRequestFullscreen();
-            } else { 
-                if (document.exitFullscreen) document.exitFullscreen(); 
-            }
-        }
-        
-        function showPasswordModal() { document.getElementById('password-modal-overlay').style.display = 'flex'; }
-        function hidePasswordModal() { document.getElementById('password-modal-overlay').style.display = 'none'; }
-        
-        function checkPassword() {
-            if (document.getElementById('password-input').value === PASSWORD) { 
-                window.open(SPREADSHEET_URL, '_blank'); 
-                hidePasswordModal(); 
-            } else { 
-                alert("密碼錯誤！"); 
+            if (isPreroll) {
+                timerEl.classList.add('text-blue');
+            } else if (remainSeconds > 0 && remainSeconds <= 60) {
+                timerEl.classList.add('text-red', 'blink');
             }
         }
 
-        window.onload = () => { 
-            setInterval(updateClock, 1000); 
-            loadSchedule(); 
-            updateFooterStatus(); 
-            // 每 30 秒自動同步數據
-            setInterval(() => { if (updateStatus !== "讀取中") loadSchedule(); }, 30000); 
-            document.addEventListener('fullscreenchange', updateFooterStatus);
-            document.addEventListener('webkitfullscreenchange', updateFooterStatus);
+        function showAlert(msg, subText = "時間提醒") {
+            const screen = document.getElementById('alert-screen');
+            document.getElementById('alert-msg').textContent = msg;
+            document.getElementById('alert-sub').textContent = subText;
+            screen.style.display = 'flex';
+            setTimeout(() => { screen.style.display = 'none'; }, 6000);
+        }
+
+        function updateSyncUI(status, text) {
+            const dot = document.getElementById('status-dot');
+            document.getElementById('status-text').textContent = text;
+            dot.className = "status-dot"; 
+            if (status === 'loading') dot.classList.add('loading');
+            if (status === 'error') dot.classList.add('error');
+        }
+
+        window.onload = () => {
+            initHall(); 
+            setInterval(tickClock, 1000);
+            
+            setInterval(() => {
+                if (remainSeconds > 0) {
+                    remainSeconds--;
+                    updateTimerDisplay();
+                    checkAlertTrigger();
+                } else if (remainSeconds === 0) {
+                    checkAlertTrigger(); 
+                }
+            }, 1000);
+
+            fetchSync();
+            setInterval(fetchSync, 15000);
+
+            document.body.ondblclick = (e) => {
+                if (e.target.tagName.toLowerCase() === 'select' || e.target.tagName.toLowerCase() === 'option') return;
+                if (!document.fullscreenElement) document.documentElement.requestFullscreen();
+                else document.exitFullscreen();
+            };
         };
     </script>
 </body>
