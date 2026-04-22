@@ -49,7 +49,7 @@
         .status-dot.disabled { background: var(--disabled); }
         #sync-countdown { color: #888; font-size: 0.85rem; margin-left: 2px; font-variant-numeric: tabular-nums; width: 25px; text-align: right; }
 
-        /* 🌟 自動抓取開關樣式 🌟 */
+        /* 自動抓取開關樣式 */
         .switch-wrap { display: flex; align-items: center; gap: 8px; background: #1e1f22; padding: 5px 12px; border-radius: 20px; border: 1px solid #333; }
         .switch-label { font-size: 0.85rem; color: #aaa; font-weight: bold; }
         .switch { position: relative; display: inline-block; width: 34px; height: 20px; }
@@ -237,7 +237,7 @@
     </div>
 
     <div class="bottom-right-info">
-        <span>三重視聽 Ver. 2.9 (手動/自動切換版)</span>
+        <span>三重視聽 Ver. 3.0 (瞬時切換版)</span>
         <a href="https://docs.google.com/spreadsheets/d/1ynJaZK2OXOChlMo0eQ2Y5ZTWD1EV0Xwm3_8oty6Rmd8/edit" target="_blank">⚙️ 後台連結</a>
     </div>
 
@@ -263,7 +263,7 @@
         let zeroDisplayDuration = 5000;  
 
         let syncTimer = 5; 
-        let isAutoFetchEnabled = false; // 🌟 預設關閉自動抓取 🌟
+        let isAutoFetchEnabled = false; 
 
         function initHall() {
             const urlParams = new URLSearchParams(window.location.search);
@@ -277,7 +277,6 @@
             window.location.href = window.location.pathname + "?hall=" + encodeURIComponent(selected);
         }
 
-        // 🌟 切換自動抓取開關 🌟
         function toggleAutoFetch() {
             isAutoFetchEnabled = document.getElementById('auto-fetch-toggle').checked;
             if (!isAutoFetchEnabled) {
@@ -306,7 +305,7 @@
         }
 
         async function fetchSync() {
-            if (!isAutoFetchEnabled && syncTimer < 5) return; // 如果沒開且不是初次觸發就跳過
+            if (!isAutoFetchEnabled && syncTimer < 5) return; 
 
             updateSyncUI('loading', `正在同步...`);
             try {
@@ -339,6 +338,7 @@
                         let zeroStatus = courseZeroEn ? `開(閃${zeroDisplayDuration/1000}s)` : `關`;
                         document.getElementById('debug-msg').textContent = `倒數10/5/3: ${alertStatus} | 0分提醒: ${zeroStatus}`;
 
+                        // 🌟 若換了課程名稱，清空提醒記憶，確保新課程會依照設定提醒 🌟
                         if (data.current.name !== currentCourseName) {
                             currentCourseName = data.current.name;
                             triggeredAlerts.clear(); 
@@ -352,7 +352,7 @@
                         remainSeconds = 0;
                         if (currentCourseName !== "") { currentCourseName = ""; triggeredAlerts.clear(); }
                         isPreroll = false;
-                        document.getElementById('cur-name').textContent = "--";
+                        document.getElementById('cur-name').textContent = "目前休息中";
                         document.getElementById('cur-speaker').textContent = "--";
                         document.getElementById('cur-time').textContent = "--:-- - --:-- (--Min)";
                         document.getElementById('debug-msg').textContent = "目前無課程";
@@ -364,7 +364,7 @@
                         let duration = calcDuration(data.next.start, data.next.end);
                         document.getElementById('next-time').textContent = `${data.next.start} - ${data.next.end} (${duration}Min)`;
                     } else {
-                        document.getElementById('next-name').textContent = "--";
+                        document.getElementById('next-name').textContent = "今日課程結束";
                         document.getElementById('next-speaker').textContent = "--";
                         document.getElementById('next-time').textContent = "--:-- - --:-- (--Min)";
                     }
@@ -390,7 +390,7 @@
         }
 
         function checkAlertTrigger() {
-            if (isPreroll || currentCourseName === "") return;
+            if (isPreroll || currentCourseName === "" || currentCourseName === "目前休息中") return;
 
             if (courseZeroEn) {
                 if (remainSeconds <= 0 && !triggeredAlerts.has('ZERO')) {
@@ -417,7 +417,7 @@
             const m = Math.floor(remainSeconds / 60);
             const s = remainSeconds % 60;
             const timerEl = document.getElementById('main-timer');
-            if (currentCourseName === "") {
+            if (currentCourseName === "" || currentCourseName === "目前休息中") {
                 timerEl.textContent = "00:00";
                 timerEl.className = "";
                 timerEl.style.color = "#444"; 
@@ -457,11 +457,18 @@
             initHall(); 
             setInterval(tickClock, 1000);
             setInterval(() => {
+                let wasPositive = remainSeconds > 0;
                 if (remainSeconds > 0) { remainSeconds--; }
+                
                 updateTimerDisplay();
                 checkAlertTrigger(); 
 
-                // 🌟 只有在自動抓取開啟時才處理同步計時 🌟
+                // 🌟 核心修復：計時歸零時若開啟自動抓取，立即同步一次以跑下一階段 🌟
+                if (wasPositive && remainSeconds === 0 && isAutoFetchEnabled) {
+                    syncTimer = 5; 
+                    fetchSync();
+                }
+
                 if (isAutoFetchEnabled) {
                     syncTimer--;
                     document.getElementById('sync-countdown').textContent = `(${syncTimer}s)`;
@@ -472,7 +479,6 @@
                 }
             }, 1000);
 
-            // 初次載入
             fetchSync();
 
             document.body.ondblclick = (e) => {
