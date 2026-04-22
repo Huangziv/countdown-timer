@@ -191,14 +191,14 @@
                     <div class="switch-wrap">
                         <span class="switch-label">自動抓取</span>
                         <label class="switch">
-                            <input type="checkbox" id="auto-fetch-toggle" onchange="toggleAutoFetch()">
+                            <input type="checkbox" id="auto-fetch-toggle" onchange="toggleAutoFetch()" checked>
                             <span class="slider"></span>
                         </label>
                     </div>
 
                     <div class="sync-tag" id="sync-container">
-                        <div id="status-dot" class="status-dot disabled"></div>
-                        <span id="status-text">自動抓取已關閉</span>
+                        <div id="status-dot" class="status-dot loading"></div>
+                        <span id="status-text">正在同步...</span>
                         <span id="sync-countdown"></span>
                     </div>
                 </div>
@@ -265,7 +265,7 @@
         let zeroDisplayDuration = 5000;  
 
         let syncTimer = 5; 
-        let isAutoFetchEnabled = false; 
+        let isAutoFetchEnabled = true; // 🌟 預設開啟自動抓取 🌟
 
         function initHall() {
             const urlParams = new URLSearchParams(window.location.search);
