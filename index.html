@@ -13,6 +13,7 @@
             --success: #00c853;
             --warning: #ffab00;
             --info-blue: #3498db; 
+            --disabled: #666;
         }
         body {
             margin: 0; padding: 25px; height: 100vh; box-sizing: border-box;
@@ -36,6 +37,7 @@
         }
         .hall-select:hover { border-color: var(--primary); }
 
+        .sync-group { display: flex; align-items: center; gap: 12px; }
         .sync-tag { 
             background: #1e1f22; padding: 8px 15px; border-radius: 30px; 
             font-size: 0.9rem; display: flex; align-items: center; gap: 10px;
@@ -44,7 +46,18 @@
         .status-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--success); }
         .status-dot.loading { background: var(--warning); animation: pulse 1s infinite; }
         .status-dot.error { background: var(--danger); }
+        .status-dot.disabled { background: var(--disabled); }
         #sync-countdown { color: #888; font-size: 0.85rem; margin-left: 2px; font-variant-numeric: tabular-nums; width: 25px; text-align: right; }
+
+        /* 🌟 自動抓取開關樣式 🌟 */
+        .switch-wrap { display: flex; align-items: center; gap: 8px; background: #1e1f22; padding: 5px 12px; border-radius: 20px; border: 1px solid #333; }
+        .switch-label { font-size: 0.85rem; color: #aaa; font-weight: bold; }
+        .switch { position: relative; display: inline-block; width: 34px; height: 20px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #444; transition: .3s; border-radius: 20px; }
+        .slider:before { position: absolute; content: ""; height: 14px; width: 14px; left: 3px; bottom: 3px; background-color: white; transition: .3s; border-radius: 50%; }
+        input:checked + .slider { background-color: var(--primary); }
+        input:checked + .slider:before { transform: translateX(14px); }
 
         #debug-msg {
             color: var(--warning);
@@ -173,10 +186,20 @@
                     <option value="感恩堂">📍 感恩堂</option>
                 </select>
 
-                <div class="sync-tag" id="sync-container">
-                    <div id="status-dot" class="status-dot"></div>
-                    <span id="status-text">系統啟動中</span>
-                    <span id="sync-countdown"></span>
+                <div class="sync-group">
+                    <div class="switch-wrap">
+                        <span class="switch-label">自動抓取</span>
+                        <label class="switch">
+                            <input type="checkbox" id="auto-fetch-toggle" onchange="toggleAutoFetch()">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+
+                    <div class="sync-tag" id="sync-container">
+                        <div id="status-dot" class="status-dot disabled"></div>
+                        <span id="status-text">自動抓取已關閉</span>
+                        <span id="sync-countdown"></span>
+                    </div>
                 </div>
             </div>
             <div id="debug-msg">連線取得設定中...</div> 
@@ -214,7 +237,7 @@
     </div>
 
     <div class="bottom-right-info">
-        <span>三重視聽 Ver. 2.8 (極速同步版)</span>
+        <span>三重視聽 Ver. 2.9 (手動/自動切換版)</span>
         <a href="https://docs.google.com/spreadsheets/d/1ynJaZK2OXOChlMo0eQ2Y5ZTWD1EV0Xwm3_8oty6Rmd8/edit" target="_blank">⚙️ 後台連結</a>
     </div>
 
@@ -240,6 +263,7 @@
         let zeroDisplayDuration = 5000;  
 
         let syncTimer = 5; 
+        let isAutoFetchEnabled = false; // 🌟 預設關閉自動抓取 🌟
 
         function initHall() {
             const urlParams = new URLSearchParams(window.location.search);
@@ -251,6 +275,18 @@
         function changeHall() {
             const selected = document.getElementById('hall-selector').value;
             window.location.href = window.location.pathname + "?hall=" + encodeURIComponent(selected);
+        }
+
+        // 🌟 切換自動抓取開關 🌟
+        function toggleAutoFetch() {
+            isAutoFetchEnabled = document.getElementById('auto-fetch-toggle').checked;
+            if (!isAutoFetchEnabled) {
+                updateSyncUI('disabled', '自動抓取已關閉');
+                document.getElementById('sync-countdown').textContent = '';
+            } else {
+                syncTimer = 5; 
+                fetchSync();
+            }
         }
 
         function tickClock() {
@@ -270,6 +306,8 @@
         }
 
         async function fetchSync() {
+            if (!isAutoFetchEnabled && syncTimer < 5) return; // 如果沒開且不是初次觸發就跳過
+
             updateSyncUI('loading', `正在同步...`);
             try {
                 const fetchUrl = API_BASE_URL + "?hall=" + encodeURIComponent(currentHall);
@@ -301,7 +339,6 @@
                         let zeroStatus = courseZeroEn ? `開(閃${zeroDisplayDuration/1000}s)` : `關`;
                         document.getElementById('debug-msg').textContent = `倒數10/5/3: ${alertStatus} | 0分提醒: ${zeroStatus}`;
 
-                        // 🌟 切換下一階段課程時，清空記憶並立即觸發檢查 🌟
                         if (data.current.name !== currentCourseName) {
                             currentCourseName = data.current.name;
                             triggeredAlerts.clear(); 
@@ -334,7 +371,7 @@
                     
                     updateSyncUI('success', "雲端同步成功");
                     updateTimerDisplay();
-                    checkAlertTrigger(); // 🌟 同步完立刻檢查一次提醒 🌟
+                    checkAlertTrigger(); 
                 } else {
                     updateSyncUI('error', "無法讀取排程");
                 }
@@ -355,7 +392,6 @@
         function checkAlertTrigger() {
             if (isPreroll || currentCourseName === "") return;
 
-            // 1. 🌟 時間到提醒修復：改為小於等於 0 秒即觸發，確保不漏接 🌟
             if (courseZeroEn) {
                 if (remainSeconds <= 0 && !triggeredAlerts.has('ZERO')) {
                     triggeredAlerts.add('ZERO');
@@ -363,11 +399,9 @@
                 }
             } 
             
-            // 2. 🌟 倒數提醒修復：增加判定範圍(20秒)，確保同步跳秒時也能捕捉到 🌟
             if (courseAlertEn && remainSeconds > 0) {
                 const fixedTargets = [600, 300, 180]; 
                 for (let targetSeconds of fixedTargets) {
-                    // 若剩餘時間低於目標且在 20 秒緩衝內，且該課程尚未提醒過
                     if (remainSeconds <= targetSeconds && remainSeconds > (targetSeconds - 20)) {
                         if (!triggeredAlerts.has(`ALERT_${targetSeconds}`)) {
                             triggeredAlerts.add(`ALERT_${targetSeconds}`);
@@ -410,10 +444,13 @@
 
         function updateSyncUI(status, text) {
             const dot = document.getElementById('status-dot');
-            document.getElementById('status-text').textContent = text;
+            const statusTxt = document.getElementById('status-text');
+            statusTxt.textContent = text;
             dot.className = "status-dot"; 
             if (status === 'loading') dot.classList.add('loading');
             if (status === 'error') dot.classList.add('error');
+            if (status === 'disabled') dot.classList.add('disabled');
+            if (status === 'success') dot.classList.add('success');
         }
 
         window.onload = () => {
@@ -423,12 +460,21 @@
                 if (remainSeconds > 0) { remainSeconds--; }
                 updateTimerDisplay();
                 checkAlertTrigger(); 
-                syncTimer--;
-                document.getElementById('sync-countdown').textContent = `(${syncTimer}s)`;
-                if (syncTimer <= 0) { syncTimer = 5; fetchSync(); }
+
+                // 🌟 只有在自動抓取開啟時才處理同步計時 🌟
+                if (isAutoFetchEnabled) {
+                    syncTimer--;
+                    document.getElementById('sync-countdown').textContent = `(${syncTimer}s)`;
+                    if (syncTimer <= 0) { 
+                        syncTimer = 5; 
+                        fetchSync(); 
+                    }
+                }
             }, 1000);
+
+            // 初次載入
             fetchSync();
-            document.getElementById('sync-countdown').textContent = `(${syncTimer}s)`;
+
             document.body.ondblclick = (e) => {
                 if (e.target.tagName.toLowerCase() === 'select' || e.target.tagName.toLowerCase() === 'option') return;
                 if (!document.fullscreenElement) document.documentElement.requestFullscreen();
