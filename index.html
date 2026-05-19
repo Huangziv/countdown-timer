@@ -71,8 +71,6 @@
             flex-grow: 1; display: flex; justify-content: center; align-items: center; 
             min-height: 0; 
         }
-        
-        /* 修改點：移除了 cursor: pointer */
         #main-timer { 
             font-size: min(35vw, 55vh); 
             line-height: 0.9; 
@@ -123,7 +121,7 @@
 
         #alert-screen {
             position: fixed; top:0; left:0; width: 100%; height:100%;
-            background: var(--danger); z-index: 9999; display: none;
+            background: var(--danger); z-index: 99999; display: none;
             flex-direction: column; justify-content: center; align-items: center; color: white;
             animation: bg-pulse 1s infinite alternate;
             text-align: center;
@@ -136,6 +134,7 @@
             text-shadow: 0 5px 20px rgba(0,0,0,0.5); 
         }
         #alert-msg { 
+            /* 可在這裡修改提醒文字大小，目前為 13vw */
             font-size: 19vw; 
             margin: 0; 
             font-weight: 900; 
@@ -208,7 +207,6 @@
     </div>
 
     <div class="timer-wrap">
-        <!-- 修改點：移除了 title 浮動提示 -->
         <div id="main-timer">--:--</div>
     </div>
 
@@ -239,7 +237,7 @@
     </div>
 
     <div class="bottom-right-info">
-        <span>三重視聽 Ver. 3.5 (防誤觸正式版)</span>
+        <span>三重視聽 Ver. 3.6 (測試無礙版)</span>
         <a href="https://docs.google.com/spreadsheets/d/1ynJaZK2OXOChlMo0eQ2Y5ZTWD1EV0Xwm3_8oty6Rmd8/edit" target="_blank">⚙️ 後台連結</a>
     </div>
 
@@ -340,6 +338,8 @@
                             let diff = Math.abs(calculatedNewTarget - targetEndTime);
                             if (diff > 5000) {
                                 targetEndTime = calculatedNewTarget;
+                                // 🌟【修復】：如果發現後台大幅修改了時間（測試用），自動清空提醒記憶！
+                                triggeredAlerts.clear(); 
                             }
                         } else {
                             targetEndTime = calculatedNewTarget;
@@ -409,6 +409,7 @@
         }
 
         function checkAlertTrigger() {
+            // 課前倒數 (Preroll) 期間，不觸發提醒
             if (isPreroll || !currentCourseName || currentCourseName === "休息中 / 無排程") return;
             
             let remainSeconds = getSmoothRemainingSeconds();
@@ -509,14 +510,11 @@
 
             fetchSync();
 
-            // 保留雙擊全螢幕功能
             document.body.ondblclick = (e) => {
                 if (e.target.tagName.toLowerCase() === 'select' || e.target.tagName.toLowerCase() === 'option') return;
                 if (!document.fullscreenElement) document.documentElement.requestFullscreen();
                 else document.exitFullscreen();
             };
-            
-            // 修改點：完全移除了 document.getElementById('main-timer').onclick = () => { ... }
         };
     </script>
 </body>
