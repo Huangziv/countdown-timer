@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>三重視聽計時系統 (完美無縫同步版)</title>
+    <title>三重視聽計時系統 (抗 GAS 延遲版)</title>
     <style>
         :root {
             --bg-color: #121212;
@@ -135,7 +135,7 @@
             text-shadow: 0 5px 20px rgba(0,0,0,0.5); 
         }
         #alert-msg { 
-            font-size: 13vw; 
+            font-size: 15vw; 
             margin: 0; 
             font-weight: 900; 
             text-shadow: 0 10px 30px rgba(0,0,0,0.5); 
@@ -237,7 +237,7 @@
     </div>
 
     <div class="bottom-right-info">
-        <span>三重視聽 Ver. 3.3 (無縫完美同步版)</span>
+        <span>三重視聽 Ver. 3.4 (防伺服器延遲跳格版)</span>
         <a href="https://docs.google.com/spreadsheets/d/1ynJaZK2OXOChlMo0eQ2Y5ZTWD1EV0Xwm3_8oty6Rmd8/edit" target="_blank">⚙️ 後台連結</a>
     </div>
 
@@ -304,7 +304,6 @@
             } catch(e) { return "--"; }
         }
 
-        // 核心修正：使用 Math.round (四捨五入) 取代無條件進位，完美對齊整秒軸
         function getSmoothRemainingSeconds() {
             if (targetEndTime === 0) return 0;
             let rem = Math.round((targetEndTime - Date.now()) / 1000);
@@ -315,7 +314,6 @@
             if (!isAutoFetchEnabled && syncTimer < 5) return; 
 
             updateSyncUI('loading', `正在同步...`);
-            let requestStartTime = Date.now(); // 記錄請求發出的時間
 
             try {
                 const fetchUrl = API_BASE_URL + "?hall=" + encodeURIComponent(currentHall);
@@ -334,11 +332,19 @@
                         let serverRemain = Number(data.current.remainingSeconds) || 0;
                         if (isNaN(serverRemain) || serverRemain < 0) serverRemain = 0;
                         
-                        // 核心防跳修正：計算網路來回延遲時間 (Network Round-trip Latency)
-                        let latency = (Date.now() - requestStartTime) / 2000; // 取得單程推估延遲（秒）
+                        let calculatedNewTarget = Date.now() + (serverRemain * 1000);
                         
-                        // 用原本剩餘秒數，減去已經在網路上飛的時間，算出最精準的未來終點戳
-                        targetEndTime = Date.now() + ((serverRemain - latency) * 1000);
+                        // 【防止跳秒核心邏輯】：如果同一堂課，且網頁本地計算的時間跟 GAS 給的時間誤差在 5 秒之內，就捨棄 GAS 的時間不更新！
+                        if (data.current.name === currentCourseName && targetEndTime !== 0) {
+                            let diff = Math.abs(calculatedNewTarget - targetEndTime);
+                            // 只有誤差大於 5 秒 (代表後台有人手動加減時間)，才允許蓋掉網頁現在滑順倒數的時間
+                            if (diff > 5000) {
+                                targetEndTime = calculatedNewTarget;
+                            }
+                        } else {
+                            // 如果是剛載入網頁，或是課程換了，直接套用雲端時間
+                            targetEndTime = calculatedNewTarget;
+                        }
                         
                         isPreroll = data.current.isPreroll;
                         courseAlertEn = !!data.current.alertEn;
