@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>三重視聽計時系統 (抗 GAS 延遲版)</title>
+    <title>三重視聽計時系統 (正式版)</title>
     <style>
         :root {
             --bg-color: #121212;
@@ -71,6 +71,8 @@
             flex-grow: 1; display: flex; justify-content: center; align-items: center; 
             min-height: 0; 
         }
+        
+        /* 修改點：移除了 cursor: pointer */
         #main-timer { 
             font-size: min(35vw, 55vh); 
             line-height: 0.9; 
@@ -78,7 +80,6 @@
             font-family: 'Courier New', Courier, monospace;
             letter-spacing: -0.5vw; text-shadow: 0 0 50px rgba(0,0,0,0.8);
             transition: color 0.3s ease;
-            cursor: pointer; 
         }
 
         .footer-grid { 
@@ -135,7 +136,7 @@
             text-shadow: 0 5px 20px rgba(0,0,0,0.5); 
         }
         #alert-msg { 
-            font-size: 15vw; 
+            font-size: 20vw; 
             margin: 0; 
             font-weight: 900; 
             text-shadow: 0 10px 30px rgba(0,0,0,0.5); 
@@ -207,7 +208,8 @@
     </div>
 
     <div class="timer-wrap">
-        <div id="main-timer" title="點擊這裡可以測試紅色閃爍提醒">--:--</div>
+        <!-- 修改點：移除了 title 浮動提示 -->
+        <div id="main-timer">--:--</div>
     </div>
 
     <div class="footer-grid">
@@ -237,7 +239,7 @@
     </div>
 
     <div class="bottom-right-info">
-        <span>三重視聽 Ver. 3.4 (防伺服器延遲跳格版)</span>
+        <span>三重視聽 Ver. 3.5 (防誤觸正式版)</span>
         <a href="https://docs.google.com/spreadsheets/d/1ynJaZK2OXOChlMo0eQ2Y5ZTWD1EV0Xwm3_8oty6Rmd8/edit" target="_blank">⚙️ 後台連結</a>
     </div>
 
@@ -334,15 +336,12 @@
                         
                         let calculatedNewTarget = Date.now() + (serverRemain * 1000);
                         
-                        // 【防止跳秒核心邏輯】：如果同一堂課，且網頁本地計算的時間跟 GAS 給的時間誤差在 5 秒之內，就捨棄 GAS 的時間不更新！
                         if (data.current.name === currentCourseName && targetEndTime !== 0) {
                             let diff = Math.abs(calculatedNewTarget - targetEndTime);
-                            // 只有誤差大於 5 秒 (代表後台有人手動加減時間)，才允許蓋掉網頁現在滑順倒數的時間
                             if (diff > 5000) {
                                 targetEndTime = calculatedNewTarget;
                             }
                         } else {
-                            // 如果是剛載入網頁，或是課程換了，直接套用雲端時間
                             targetEndTime = calculatedNewTarget;
                         }
                         
@@ -510,15 +509,14 @@
 
             fetchSync();
 
+            // 保留雙擊全螢幕功能
             document.body.ondblclick = (e) => {
                 if (e.target.tagName.toLowerCase() === 'select' || e.target.tagName.toLowerCase() === 'option') return;
                 if (!document.fullscreenElement) document.documentElement.requestFullscreen();
                 else document.exitFullscreen();
             };
             
-            document.getElementById('main-timer').onclick = () => {
-                showAlert("剩下 10 分鐘", "提醒您", 3000);
-            };
+            // 修改點：完全移除了 document.getElementById('main-timer').onclick = () => { ... }
         };
     </script>
 </body>
