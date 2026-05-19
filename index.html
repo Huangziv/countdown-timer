@@ -1,10 +1,9 @@
-cat <<EOF > index.html
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>三重視聽計時系統</title>
+    <title>三重視聽計時系統 (抗抖動穩定版)</title>
     <style>
         :root {
             --bg-color: #121212;
@@ -50,7 +49,6 @@ cat <<EOF > index.html
         .status-dot.disabled { background: var(--disabled); }
         #sync-countdown { color: #888; font-size: 0.85rem; margin-left: 2px; font-variant-numeric: tabular-nums; width: 25px; text-align: right; }
 
-        /* 自動抓取開關 */
         .switch-wrap { display: flex; align-items: center; gap: 8px; background: #1e1f22; padding: 5px 12px; border-radius: 20px; border: 1px solid #333; }
         .switch-label { font-size: 0.85rem; color: #aaa; font-weight: bold; }
         .switch { position: relative; display: inline-block; width: 34px; height: 20px; }
@@ -77,7 +75,7 @@ cat <<EOF > index.html
             font-size: min(35vw, 55vh); 
             line-height: 0.9; 
             font-weight: 900; font-variant-numeric: tabular-nums;
-            font-family: 'Courier New', Courier, monospace; /* 強制等寬防止跳動 */
+            font-family: 'Courier New', Courier, monospace; /* 固定等寬字型，防止字元縮放抖動 */
             letter-spacing: -0.5vw; text-shadow: 0 0 50px rgba(0,0,0,0.8);
             transition: color 0.3s ease;
             cursor: pointer; 
@@ -122,7 +120,6 @@ cat <<EOF > index.html
         @keyframes flash { 50% { opacity: 0.1; } }
         @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
 
-        /* 全螢幕紅色閃爍提醒 */
         #alert-screen {
             position: fixed; top:0; left:0; width: 100%; height:100%;
             background: var(--danger); z-index: 9999; display: none;
@@ -240,7 +237,7 @@ cat <<EOF > index.html
     </div>
 
     <div class="bottom-right-info">
-        <span>三重視聽 Ver. 3.1 (穩定優化版)</span>
+        <span>三重視聽 Ver. 3.2 (抗抖動防跳版)</span>
         <a href="https://docs.google.com/spreadsheets/d/1ynJaZK2OXOChlMo0eQ2Y5ZTWD1EV0Xwm3_8oty6Rmd8/edit" target="_blank">⚙️ 後台連結</a>
     </div>
 
@@ -253,7 +250,7 @@ cat <<EOF > index.html
         const API_BASE_URL = "https://script.google.com/macros/s/AKfycbwJUwQeV3ObeBNl0OjTrGj5KYS7Q5M4dXuHjzIeuii6_83EInwJwnncKlz7Ly5ojbMS/exec"; 
 
         let currentHall = "講經堂";
-        let remainSeconds = 0;
+        let targetEndTime = 0; // 核心修正：改記錄雲端預計結束的「未來時間戳」
         let isPreroll = false;
         let currentCourseName = "";
         
@@ -307,6 +304,13 @@ cat <<EOF > index.html
             } catch(e) { return "--"; }
         }
 
+        // 取得當前平滑計算出的剩餘秒數
+        function getSmoothRemainingSeconds() {
+            if (targetEndTime === 0) return 0;
+            let rem = Math.ceil((targetEndTime - Date.now()) / 1000);
+            return rem < 0 ? 0 : rem;
+        }
+
         async function fetchSync() {
             if (!isAutoFetchEnabled && syncTimer < 5) return; 
 
@@ -325,10 +329,13 @@ cat <<EOF > index.html
 
                 if (data.success) {
                     if (data.current) {
-                        remainSeconds = Number(data.current.remainingSeconds) || 0;
-                        if (isNaN(remainSeconds) || remainSeconds < 0) remainSeconds = 0;
-                        isPreroll = data.current.isPreroll;
+                        let serverRemain = Number(data.current.remainingSeconds) || 0;
+                        if (isNaN(serverRemain) || serverRemain < 0) serverRemain = 0;
                         
+                        // 平滑修正：用當前本機時間 + 伺服器剩餘秒數 = 算出精準的結束時間點
+                        targetEndTime = Date.now() + (serverRemain * 1000);
+                        
+                        isPreroll = data.current.isPreroll;
                         courseAlertEn = !!data.current.alertEn;
                         let rawAlertVal = (data.current.alertVals && data.current.alertVals.length > 0) ? data.current.alertVals[0] : 0; 
                         alertDisplayDuration = (rawAlertVal > 0) ? rawAlertVal * 1000 : 5000;
@@ -351,7 +358,7 @@ cat <<EOF > index.html
                         let duration = calcDuration(data.current.start, data.current.end);
                         document.getElementById('cur-time').textContent = `${data.current.start} - ${data.current.end} (${duration}Min)`;
                     } else {
-                        remainSeconds = 0;
+                        targetEndTime = 0;
                         if (currentCourseName !== "") { currentCourseName = ""; triggeredAlerts.clear(); }
                         isPreroll = false;
                         document.getElementById('cur-name').textContent = "休息中 / 無排程";
@@ -393,6 +400,8 @@ cat <<EOF > index.html
 
         function checkAlertTrigger() {
             if (isPreroll || !currentCourseName || currentCourseName === "休息中 / 無排程") return;
+            
+            let remainSeconds = getSmoothRemainingSeconds();
 
             if (courseZeroEn) {
                 if (remainSeconds <= 0 && !triggeredAlerts.has('ZERO_DONE')) {
@@ -404,7 +413,7 @@ cat <<EOF > index.html
             if (courseAlertEn && remainSeconds > 0) {
                 const fixedTargets = [600, 300, 180]; 
                 for (let targetSeconds of fixedTargets) {
-                    if (remainSeconds <= targetSeconds && remainSeconds > (targetSeconds - 30)) {
+                    if (remainSeconds <= targetSeconds && remainSeconds > (targetSeconds - 15)) {
                         if (!triggeredAlerts.has(`ALERT_${targetSeconds}`)) {
                             triggeredAlerts.add(`ALERT_${targetSeconds}`);
                             showAlert("剩下 " + formatTimeText(targetSeconds), "提醒您", alertDisplayDuration);
@@ -415,6 +424,7 @@ cat <<EOF > index.html
         }
 
         function updateTimerDisplay() {
+            let remainSeconds = getSmoothRemainingSeconds();
             const m = Math.floor(remainSeconds / 60);
             const s = remainSeconds % 60;
             const timerEl = document.getElementById('main-timer');
@@ -466,15 +476,15 @@ cat <<EOF > index.html
             setInterval(tickClock, 1000);
             
             setInterval(() => {
+                let remainSeconds = getSmoothRemainingSeconds();
                 let wasPositive = remainSeconds > 0;
                 
-                // 修正：防堵扣到負數
-                if (remainSeconds > 0) { remainSeconds--; }
-                
+                // 本地定時更新顯示，不直接對 remainSeconds 做減法，完全走時間軸比對
                 updateTimerDisplay();
                 checkAlertTrigger(); 
 
-                if (wasPositive && remainSeconds === 0 && isAutoFetchEnabled) {
+                // 剛好歸零的瞬間立刻要求同步下一場
+                if (wasPositive && getSmoothRemainingSeconds() === 0 && isAutoFetchEnabled) {
                     syncTimer = 5; 
                     fetchSync();
                 }
@@ -504,4 +514,3 @@ cat <<EOF > index.html
     </script>
 </body>
 </html>
-EOF
