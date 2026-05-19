@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>三重視聽計時系統 (抗抖動穩定版)</title>
+    <title>三重視聽計時系統 (完美無縫同步版)</title>
     <style>
         :root {
             --bg-color: #121212;
@@ -75,7 +75,7 @@
             font-size: min(35vw, 55vh); 
             line-height: 0.9; 
             font-weight: 900; font-variant-numeric: tabular-nums;
-            font-family: 'Courier New', Courier, monospace; /* 固定等寬字型，防止字元縮放抖動 */
+            font-family: 'Courier New', Courier, monospace;
             letter-spacing: -0.5vw; text-shadow: 0 0 50px rgba(0,0,0,0.8);
             transition: color 0.3s ease;
             cursor: pointer; 
@@ -237,7 +237,7 @@
     </div>
 
     <div class="bottom-right-info">
-        <span>三重視聽 Ver. 3.2 (抗抖動防跳版)</span>
+        <span>三重視聽 Ver. 3.3 (無縫完美同步版)</span>
         <a href="https://docs.google.com/spreadsheets/d/1ynJaZK2OXOChlMo0eQ2Y5ZTWD1EV0Xwm3_8oty6Rmd8/edit" target="_blank">⚙️ 後台連結</a>
     </div>
 
@@ -250,7 +250,7 @@
         const API_BASE_URL = "https://script.google.com/macros/s/AKfycbwJUwQeV3ObeBNl0OjTrGj5KYS7Q5M4dXuHjzIeuii6_83EInwJwnncKlz7Ly5ojbMS/exec"; 
 
         let currentHall = "講經堂";
-        let targetEndTime = 0; // 核心修正：改記錄雲端預計結束的「未來時間戳」
+        let targetEndTime = 0; 
         let isPreroll = false;
         let currentCourseName = "";
         
@@ -304,10 +304,10 @@
             } catch(e) { return "--"; }
         }
 
-        // 取得當前平滑計算出的剩餘秒數
+        // 核心修正：使用 Math.round (四捨五入) 取代無條件進位，完美對齊整秒軸
         function getSmoothRemainingSeconds() {
             if (targetEndTime === 0) return 0;
-            let rem = Math.ceil((targetEndTime - Date.now()) / 1000);
+            let rem = Math.round((targetEndTime - Date.now()) / 1000);
             return rem < 0 ? 0 : rem;
         }
 
@@ -315,6 +315,8 @@
             if (!isAutoFetchEnabled && syncTimer < 5) return; 
 
             updateSyncUI('loading', `正在同步...`);
+            let requestStartTime = Date.now(); // 記錄請求發出的時間
+
             try {
                 const fetchUrl = API_BASE_URL + "?hall=" + encodeURIComponent(currentHall);
                 const response = await fetch(fetchUrl, { redirect: 'follow' });
@@ -332,8 +334,11 @@
                         let serverRemain = Number(data.current.remainingSeconds) || 0;
                         if (isNaN(serverRemain) || serverRemain < 0) serverRemain = 0;
                         
-                        // 平滑修正：用當前本機時間 + 伺服器剩餘秒數 = 算出精準的結束時間點
-                        targetEndTime = Date.now() + (serverRemain * 1000);
+                        // 核心防跳修正：計算網路來回延遲時間 (Network Round-trip Latency)
+                        let latency = (Date.now() - requestStartTime) / 2000; // 取得單程推估延遲（秒）
+                        
+                        // 用原本剩餘秒數，減去已經在網路上飛的時間，算出最精準的未來終點戳
+                        targetEndTime = Date.now() + ((serverRemain - latency) * 1000);
                         
                         isPreroll = data.current.isPreroll;
                         courseAlertEn = !!data.current.alertEn;
@@ -479,11 +484,9 @@
                 let remainSeconds = getSmoothRemainingSeconds();
                 let wasPositive = remainSeconds > 0;
                 
-                // 本地定時更新顯示，不直接對 remainSeconds 做減法，完全走時間軸比對
                 updateTimerDisplay();
                 checkAlertTrigger(); 
 
-                // 剛好歸零的瞬間立刻要求同步下一場
                 if (wasPositive && getSmoothRemainingSeconds() === 0 && isAutoFetchEnabled) {
                     syncTimer = 5; 
                     fetchSync();
